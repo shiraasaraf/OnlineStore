@@ -13,6 +13,8 @@ public class BookProduct extends Product {
                        Color color, String author, int pages){
 
         super(name, price, stock, description, category, color);
+        this.author = author;
+        this.pages = pages;
 
     }
 
