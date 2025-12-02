@@ -14,14 +14,49 @@ public abstract class  Product implements StoreEntity, PricedItem, StockManageab
     private Color color;
 
     //c'tor
+    /**
+     * Constructs a new Product with validation and default values.
+     *
+     * @param name          product name (must be non-null and non-empty to be used)
+     * @param price         product price (must be positive)
+     * @param stock         initial stock amount (must be non-negative)
+     * @param description   product description (may be null)
+     * @param category      product category (must be non-null to be used)
+     * @param color         product color (may be null)
+     */
     public Product(String name, double price, int stock, String description,
                    Category category, Color color) {
-        this.name = name;
-        setPrice(price);
-        setStock(stock);
-        this.description = description;
-        this.category = category;
-        this.color = color;
+        //default values
+        this.name = "Unknown product";
+        this.price = 0.1;
+        this.stock = 0;
+        this.description = "";
+        this.category = Category.BOOKS; //must be something from enum. not null
+        this.color = Color.BLACK; ////must be something from Color. not null
+
+        // name – only if non-null and not blank
+        if (name != null && !name.trim().isEmpty()) {
+            this.name = name;
+        }
+
+        // description – allow empty, but not null
+        if (description != null) {
+            this.description = description;
+        }
+
+        // category – only if non-null
+        if (category != null) {
+            this.category = category;
+        }
+
+        // color – only if non-null
+        if (color != null) {
+            this.color = color;
+        }
+
+        // use setters so validation is centralized
+        setPrice(price);   // if invalid, keeps default price
+        setStock(stock);   // if invalid, keeps default stock
     }
 
 
@@ -38,7 +73,10 @@ public abstract class  Product implements StoreEntity, PricedItem, StockManageab
     //overrides must
     @Override
     public String toString() {
-        return "Name: " + name + ", Price: " + price + ", Category: " + category + ", Stock: " + stock;
+        return "Name: " + name + "\n" +
+                "Price: " + price + "\n" +
+                "Category: " + category + "\n" +
+                "Stock: " + stock;
     }
 
     @Override
@@ -58,20 +96,24 @@ public abstract class  Product implements StoreEntity, PricedItem, StockManageab
     }
 
     //implementation of interfaces-
-    // todo: check what methods to remove here and move to specific sub-class
-    // todo: methods implementation is not correct. have to write them from first, check if public
 
     //Persistable interface
     public void saveToFile(String path) {}
 
     //interface StoreEntity
     public String getDisplayName(){
-        return name;
+        return this.name;
     }
     public String getDisplayDetails(){
-        return name;
+        return "Name: " + name + "\n" +
+                "Price: " + price + "\n" +
+                "Category: " + category + "\n" +
+                "Description: " + description + "\n" +
+                "Color: " + color;
     }
 
+    // todo: methods implementation is not correct. have to write them from first, check if public
+    //todo: add getters setters javadoc
     //interface PricedItem
     public double getPrice(){
         return price;
