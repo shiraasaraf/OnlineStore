@@ -3,7 +3,7 @@ import store.core.StoreEntity;
 import store.core.Persistable;
 import java.awt.Color;
 
-public abstract class Product implements StoreEntity, PricedItem, StockManageable, Persistable   {
+public abstract class  Product implements StoreEntity, PricedItem, StockManageable, Persistable   {
 
     //data members:
     private String name;
@@ -38,7 +38,7 @@ public abstract class Product implements StoreEntity, PricedItem, StockManageabl
     //overrides must
     @Override
     public String toString() {
-        return "Name: " + name + ", Price: " + ", Category: " + category + ", Stock: " + stock;
+        return "Name: " + name + ", Price: " + price + ", Category: " + category + ", Stock: " + stock;
     }
 
     @Override

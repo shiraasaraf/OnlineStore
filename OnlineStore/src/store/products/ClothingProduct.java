@@ -13,7 +13,28 @@ public class ClothingProduct extends Product {
 
     }
 
-    //TODO - toString
+    @Override
+    public String toString() {
+        final String RED = "\u001B[31m";
+        final String RESET = "\u001B[0m";
+
+        return RED + "A Clothing Product " + RESET + super.toString() + ", Size: " + size;
+    }
+
+    public String getSize() {
+        return size;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+
+        if (this == o) return true;
+        if (o instanceof ClothingProduct) {
+            ClothingProduct clothingProduct = (ClothingProduct) o;
+            return super.equals(clothingProduct) && size.equals(clothingProduct.getSize());
+        }
+        return false;
+    }
 
 
 
