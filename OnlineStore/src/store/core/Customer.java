@@ -5,7 +5,7 @@ import store.order.Order;
 import java.util.List;
 
 
-public class Costomer extends User{
+public class Customer extends User{
     private Cart cart;
     private List<Order> orderHistory;
 
