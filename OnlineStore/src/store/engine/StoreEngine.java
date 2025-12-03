@@ -1,3 +1,9 @@
+/**
+ * Submitted by:
+ * Tamar Nahum, ID 021983812
+ * Shira Asaraf, ID 322218439
+ */
+
 package store.engine;
 
 import store.cart.Cart;
@@ -15,6 +21,16 @@ public class StoreEngine {
 
     private static int nextOrderId = 0; //uniq ID number for every order
 
+    private static StoreEngine instance = new StoreEngine();
+
+    private StoreEngine() { } // private ctor — אי אפשר new מבחוץ
+
+    //singleton
+    //todo: check implementaion
+    public static StoreEngine getInstance() {
+        return instance;
+    }
+
     public void addProduct(Product p) {
 
     }
@@ -31,4 +47,7 @@ public class StoreEngine {
     public Order createOrderFromCart(Cart cart) {
         return null;
     }
+
+
+
 }

@@ -1,3 +1,9 @@
+/**
+ * Submitted by:
+ * Tamar Nahum, ID 021983812
+ * Shira Asaraf, ID 322218439
+ */
+
 package store.cart;
 import store.products.Product;
 import java.util.List;
@@ -24,5 +30,10 @@ public class Cart {
     }
     public void clear(){
         //TODO implements
+    }
+
+    //Checking if there are items in the cart. used for check-out in Customer
+    public boolean isEmpty(){
+        return items.isEmpty();
     }
 }

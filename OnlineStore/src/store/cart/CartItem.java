@@ -1,4 +1,5 @@
 package store.cart;
+
 import store.products.Product;
 
 public class CartItem {

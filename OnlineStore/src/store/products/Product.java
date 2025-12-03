@@ -1,7 +1,15 @@
+/**
+ * Submitted by:
+ * Tamar Nahum, ID 021983812
+ * Shira Asaraf, ID 322218439
+ */
+
 package store.products;
 import store.core.StoreEntity;
 import store.core.Persistable;
 import java.awt.Color;
+import java.util.Objects;
+
 
 /**
  * Abstract base class representing a generic product in the store.
@@ -33,13 +41,14 @@ public abstract class Product implements StoreEntity, PricedItem, StockManageabl
      */
     public Product(String name, double price, int stock, String description,
                    Category category, Color color) {
+
         //default values
         this.name = "Unknown product";
         this.price = 0.1;
         this.stock = 0;
         this.description = "";
-        this.category = Category.BOOKS; //because it's must be something from enum. not null
-        this.color = Color.BLACK; //because it's must be something from Color. not null
+        this.category = Category.BOOKS; //Randomly selected because it must be from Category enum
+        this.color = Color.BLACK; //Randomly selected because it must be from Color class
 
         // name – only if non-null and not blank
         if (name != null && !name.trim().isEmpty()) {
@@ -278,7 +287,7 @@ public abstract class Product implements StoreEntity, PricedItem, StockManageabl
 
         Product other = (Product) o; //casting to Product
 
-        return this.name.equals(other.name) && //compare
+        return Objects.equals(this.name, other.name) && //compare
                 this.category == other.category;
     }
 

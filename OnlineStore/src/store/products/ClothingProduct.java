@@ -1,3 +1,9 @@
+/**
+ * Submitted by:
+ * Tamar Nahum, ID 021983812
+ * Shira Asaraf, ID 322218439
+ */
+
 package store.products;
 
 import java.awt.Color;
@@ -67,15 +73,6 @@ public class ClothingProduct extends Product {
                 "Size: " + getSize();
     }
 
-    /**
-     * Uses the equality definition from Product:
-     * products are equal if they have the same name and category.
-     */
-    @Override
-    public boolean equals(Object o) {
-        return super.equals(o);
-    }
-
-
+    //equals Implemented in parent class
 
 }
