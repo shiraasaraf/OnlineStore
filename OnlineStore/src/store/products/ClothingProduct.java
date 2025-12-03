@@ -1,39 +1,79 @@
 package store.products;
 
-import java.awt.*;
+import java.awt.Color;
 
+/**
+ * Represents a clothing product in the store.
+ * Extends {@link Product} by adding a clothing-specific field: size.
+ *
+ * This class adds additional details relevant only to clothing products
+ * while keeping general validation and behavior inside the parent class Product.
+ */
 public class ClothingProduct extends Product {
 
+    //data member
     private String size;
 
-    public ClothingProduct(String name, double price, int stock, String description, Category category,
-                           Color color, String size) {
+    /**
+     * Constructs a new ClothingProduct with validation.
+     * Invalid or null parameters are replaced with default values.
+     *
+     * @param name        product name (default if null or empty)
+     * @param price       product price (default if not positive)
+     * @param stock       initial stock (default if negative)
+     * @param description product description (empty string if null)
+     * @param category    product category (default if null)
+     * @param color       product color (default if null)
+     * @param size        clothing size (default if null or empty)
+     */
+    public ClothingProduct(String name, double price, int stock, String description,
+                           Category category, Color color, String size) {
+
         super(name, price, stock, description, category, color);
-        this.size = size;
+
+        //default value
+        this.size = "Unknown size";
+
+        // size – only if non-null and not blank
+        if (size != null && !size.trim().isEmpty()) {
+            this.size = size;
+        }
 
     }
 
+    //-----------------------------------------------------------------------------------------
+
+    /**
+     * Returns the clothing size.
+     *
+     * @return the size value
+     */
+    public String getSize() {
+        return this.size;
+    }
+
+    //------------------------------------------------------------------------------------------
+
+    /**
+     * Returns a multi-line string describing this clothing product,
+     * including all product details and the clothing-specific size field.
+     *
+     * @return string representation of this clothing product
+     */
     @Override
     public String toString() {
-        final String RED = "\u001B[31m";
-        final String RESET = "\u001B[0m";
-
-        return RED + "A Clothing Product " + RESET + super.toString() + ", Size: " + size;
+        return "Clothing Product\n" +
+                super.toString() + "\n" +
+                "Size: " + getSize();
     }
 
-    public String getSize() {
-        return size;
-    }
-
+    /**
+     * Uses the equality definition from Product:
+     * products are equal if they have the same name and category.
+     */
     @Override
     public boolean equals(Object o) {
-
-        if (this == o) return true;
-        if (o instanceof ClothingProduct) {
-            ClothingProduct clothingProduct = (ClothingProduct) o;
-            return super.equals(clothingProduct) && size.equals(clothingProduct.getSize());
-        }
-        return false;
+        return super.equals(o);
     }
 
 

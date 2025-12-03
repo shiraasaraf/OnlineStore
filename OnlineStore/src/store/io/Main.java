@@ -1,3 +1,13 @@
+/**
+ * Submitted by:
+ * Tamar Nahum, ID 021983812
+ * Shira Asaraf, ID 322218439
+ *
+ * This file is part of Assignment 1 in the course
+ * Advanced Object-Oriented Programming - Java.
+ */
+
+
 package store.io;
 
 import store.cart.Cart;

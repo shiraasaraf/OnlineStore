@@ -3,7 +3,13 @@ import store.core.StoreEntity;
 import store.core.Persistable;
 import java.awt.Color;
 
-public abstract class  Product implements StoreEntity, PricedItem, StockManageable, Persistable   {
+/**
+ * Abstract base class representing a generic product in the store.
+ * Provides common fields such as name, price, stock, description, category
+ * and color, and implements interfaces for display, pricing, stock management
+ * and persistence.
+ */
+public abstract class Product implements StoreEntity, PricedItem, StockManageable, Persistable   {
 
     //data members:
     private String name;
@@ -13,16 +19,17 @@ public abstract class  Product implements StoreEntity, PricedItem, StockManageab
     private Category category;
     private Color color;
 
-    //c'tor
     /**
-     * Constructs a new Product with validation and default values.
+     * Constructs a new Product and applies validation to all parameters.
+     * Invalid or null values are replaced with default values so the product
+     * is always created in a valid state.
      *
-     * @param name          product name (must be non-null and non-empty to be used)
-     * @param price         product price (must be positive)
-     * @param stock         initial stock amount (must be non-negative)
-     * @param description   product description (may be null)
-     * @param category      product category (must be non-null to be used)
-     * @param color         product color (may be null)
+     * @param name        product name (default used if null or empty)
+     * @param price       product price (default used if not positive)
+     * @param stock       initial stock (default used if negative)
+     * @param description product description (empty string used if null)
+     * @param category    product category (default used if null)
+     * @param color       product color (default used if null)
      */
     public Product(String name, double price, int stock, String description,
                    Category category, Color color) {
@@ -31,17 +38,12 @@ public abstract class  Product implements StoreEntity, PricedItem, StockManageab
         this.price = 0.1;
         this.stock = 0;
         this.description = "";
-        this.category = Category.BOOKS; //must be something from enum. not null
-        this.color = Color.BLACK; ////must be something from Color. not null
+        this.category = Category.BOOKS; //because it's must be something from enum. not null
+        this.color = Color.BLACK; //because it's must be something from Color. not null
 
         // name – only if non-null and not blank
         if (name != null && !name.trim().isEmpty()) {
             this.name = name;
-        }
-
-        // description – allow empty, but not null
-        if (description != null) {
-            this.description = description;
         }
 
         // category – only if non-null
@@ -55,72 +57,141 @@ public abstract class  Product implements StoreEntity, PricedItem, StockManageab
         }
 
         // use setters so validation is centralized
-        setPrice(price);   // if invalid, keeps default price
-        setStock(stock);   // if invalid, keeps default stock
+    setPrice(price);                // if invalid, keeps default price
+    setStock(stock);                // if invalid, keeps default stock
+    setDescription(description);    // if invalid, keeps default description
     }
 
+    //----------------------------------------------------------------------------------------------------
 
-    //stock setter
-    public boolean setStock(int stock) {
-        if (stock < 0) {
-            return false;   // ערך לא תקין → לא משנים
-        }
-        this.stock = stock;
-        return true;        // הצליח
-    }
-
-
-    //overrides must
-    @Override
-    public String toString() {
-        return "Name: " + name + "\n" +
-                "Price: " + price + "\n" +
-                "Category: " + category + "\n" +
-                "Stock: " + stock;
-    }
-
-    @Override
-    public boolean equals(Object o) {
-        //if it's the same object
-        if (this == o) return true;
-
-        //check the instance
-        if (!(o instanceof Product)) return false;
-
-        //casting to Product
-        Product other = (Product) o;
-
-        //compare
-        return this.name.equals(other.name) &&
-                this.category == other.category;
-    }
-
-    //implementation of interfaces-
-
-    //Persistable interface
-    public void saveToFile(String path) {}
-
-    //interface StoreEntity
-    public String getDisplayName(){
+    /**
+     * Returns the product name.
+     *
+     * @return the product name
+     */
+    public String getName() {
         return this.name;
     }
-    public String getDisplayDetails(){
-        return "Name: " + name + "\n" +
-                "Price: " + price + "\n" +
-                "Category: " + category + "\n" +
-                "Description: " + description + "\n" +
-                "Color: " + color;
+
+    /**
+     * Returns the product description.
+     *
+     * @return the product description (never null)
+     */
+    public String getDescription() {
+        return this.description;
     }
 
-    // todo: methods implementation is not correct. have to write them from first, check if public
-    //todo: add getters setters javadoc
+    /**
+     * Returns the product category.
+     *
+     * @return the product category
+     */
+    public Category getCategory() {
+        return this.category;
+    }
+
+    /**
+     * Returns the product color.
+     *
+     * @return the product color
+     */
+    public Color getColor() {
+        return this.color;
+    }
+
+    /**
+     * Sets the initial stock value.
+     * Used only inside the constructor.
+     *
+     * @param stock stock value to set
+     * @return true if stock is valid and assigned, false otherwise
+     */
+    private boolean setStock(int stock) {
+        if (stock < 0) {
+            return false;
+        }
+        this.stock = stock;
+        return true;
+    }
+
+    /**
+     * Sets a new description if the value is not null.
+     *
+     * @param description new description
+     * @return true if description was assigned, false otherwise
+     */
+    protected boolean setDescription(String description) {
+        if (description == null) {
+            return false;
+        }
+        this.description = description;
+        return true;
+    }
+
+    //-------------------------------------------------------------------------------------
+
+    //implementation of interfaces:
+
+    //Persistable interface
+    /**
+     * Saves this product to a file.
+     * Currently unimplemented and handled in future assignments.
+     *
+     * @param path path of the file to save into
+     */
+    @Override
+    public void saveToFile(String path) {} //Temporarily implemented empty
+
+    //interface StoreEntity
+
+    /**
+     * Returns a short display name for UI purposes.
+     *
+     * @return a display-friendly name
+     */
+    @Override
+    public String getDisplayName(){
+        return getName();
+    }
+
+    /**
+     * Returns a detailed description for UI display,
+     * including name, price, category, description and color.
+     *
+     * @return multi-line detailed product information
+     */
+    @Override
+    public String getDisplayDetails() {
+        return "Name: " + getName() + "\n" +
+                "Price: " + getPrice() + "\n" +
+                "Category: " + getCategory() + "\n" +
+                "Description: " + getDescription() + "\n" +
+                "Color: " + getColor();
+    }
+
+    //-------------------------------------------------------------------------------------------
+
     //interface PricedItem
+
+    /**
+     * Returns the product price.
+     *
+     * @return the price of this product
+     */
+    @Override
     public double getPrice(){
         return price;
     }
 
-    //price setter
-    public boolean setPrice(double price){
+    /**
+     * Sets a new product price if it is positive.
+     *
+     * @param price new price value
+     * @return true if assigned successfully, false otherwise
+     */
+    @Override
+    public boolean setPrice(double price) {
         if (price <= 0) {
             return false;
         }
@@ -128,16 +199,89 @@ public abstract class  Product implements StoreEntity, PricedItem, StockManageab
         return true;
     }
 
+    //--------------------------------------------------------------------------------------------
+
     //interface StockManageable
+
+    /**
+     * Returns the current stock.
+     *
+     * @return the stock amount
+     */
+    @Override
     public int getStock() {
         return stock;
     }
-    public boolean increaseStock(int amount){
+
+    //set the stock through these 2 methods:
+
+    /**
+     * Increases stock by a positive amount.
+     *
+     * @param amount amount to increase
+     * @return true if updated successfully, false otherwise
+     */
+    @Override
+    public boolean increaseStock(int amount) {
+        if (amount <= 0)
+                return false;
+        stock  = stock + amount;
         return true;
     }
-    public boolean decreaseStock(int amount){
+
+    /**
+     * Decreases stock by a positive amount without going negative.
+     *
+     * @param amount amount to decrease
+     * @return true if updated successfully, false otherwise
+     */
+    @Override
+    public boolean decreaseStock(int amount) {
+        if (amount <= 0)
+            return false;
+        else if ((stock - amount) < 0)
+            return false;
+        stock = stock - amount;
         return true;
     }
+
+    //----------------------------------------------------------------------------------------------
+
+    //overrides must
+
+    /**
+     * Returns a basic multi-line string describing the product.
+     *
+     * @return product information string
+     */
+    @Override
+    public String toString() {
+        return "Name: " + getName() + "\n" +
+                "Price: " + getPrice() + "\n" +
+                "Category: " + getCategory() + "\n" +
+                "Stock: " + getStock();
+    }
+
+    /**
+     * Compares two products for equality.
+     * Products are equal if they have the same name and the same category.
+     *
+     * @param o the object to compare with
+     * @return true if the products are equal, false otherwise
+     */
+    @Override
+    public boolean equals(Object o) {
+
+        if (this == o) return true;  //if it's the same object
+
+        if (!(o instanceof Product)) return false; //check the instance
+
+        Product other = (Product) o; //casting to Product
+
+        return this.name.equals(other.name) && //compare
+                this.category == other.category;
+    }
+
 
 }
 
