@@ -6,29 +6,46 @@
 
 package store.order;
 
-import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
+
 import store.cart.CartItem;
 import store.core.Persistable;
 
 /**
- * Class representing an order made by a customer.
- * Contains order details such as ID, items, total amount and status.
+ * Represents a customer's order within the store system.
+ *
+ * An Order contains:
+ *  - A unique order ID
+ *  - A list of items (CartItems)
+ *  - The total monetary amount
+ *  - The current processing status (NEW → PAID → SHIPPED → DELIVERED)
+ *
+ * This class implements the Persistable interface and is intended
+ * to allow saving order data to persistent storage in the future.
  */
 public class Order implements Persistable {
+
+    /** Unique identifier of the order */
     private int orderID;
+
+    /** List of items included in this order (deep-copied from cart) */
     private List<CartItem> items;
+
+    /** Total monetary value of the order */
     private double totalAmount;
+
+    /** Current status of the order */
     private OrderStatus status;
 
     /**
-     * Constructs a new Order instance with given ID, items and total amount.
-     * Status is initialized to NEW.
+     * Constructs a new Order instance.
+     * The items list is copied to prevent external modification.
+     * The order is initialized with status NEW.
      *
-     * @param orderID unique identifier of the order
-     * @param items list of CartItem objects in the order (copied internally)
-     * @param totalAmount total cost of the order
+     * @param orderID     the unique identifier assigned to this order
+     * @param items       the list of items included in the order
+     * @param totalAmount the total calculated price of the order
      */
     public Order(int orderID, List<CartItem> items, double totalAmount) {
         this.orderID = orderID;
@@ -39,18 +56,23 @@ public class Order implements Persistable {
 
     /**
      * Saves the order to a file at the specified path.
-     * Implementation is pending.
+     * (Implementation expected later.)
      *
-     * @param path file path to save the order data
+     * @param path file system path where the order should be saved
      */
-    public void saveToFile(String path){
-        //TODO
+    @Override
+    public void saveToFile(String path) {
+        // TODO: Implement persistence logic
     }
+
+    // ------------------------------------------------------------------------
+    // Order Workflow
+    // ------------------------------------------------------------------------
 
     /**
      * Marks the order as paid.
      *
-     * @return true always, indicating the status was set to PAID
+     * @return true (status always set to PAID)
      */
     public boolean pay() {
         this.status = OrderStatus.PAID;
@@ -58,12 +80,12 @@ public class Order implements Persistable {
     }
 
     /**
-     * Marks the order as shipped if it has been paid.
+     * Marks the order as shipped only if the order has already been paid.
      *
      * @return true if status changed to SHIPPED, false otherwise
      */
-    public boolean ship(){
-        if(this.status == OrderStatus.PAID){
+    public boolean ship() {
+        if (this.status == OrderStatus.PAID) {
             this.status = OrderStatus.SHIPPED;
             return true;
         }
@@ -71,54 +93,79 @@ public class Order implements Persistable {
     }
 
     /**
-     * Marks the order as delivered if it has been shipped.
+     * Marks the order as delivered only if it has already been shipped.
      *
      * @return true if status changed to DELIVERED, false otherwise
      */
-    public boolean deliver(){
-        if(this.status == OrderStatus.SHIPPED){
+    public boolean deliver() {
+        if (this.status == OrderStatus.SHIPPED) {
             this.status = OrderStatus.DELIVERED;
             return true;
         }
         return false;
     }
 
+    // ------------------------------------------------------------------------
+    // Object Methods
+    // ------------------------------------------------------------------------
+
     /**
-     * Returns a string representation of the order,
-     * including order ID, status, total amount and item details.
+     * Generates a formatted, human-readable representation of the order.
      *
-     * @return formatted string describing the order
+     * @return a string describing the order ID, status, total amount, and items
      */
     @Override
     public String toString() {
         StringBuilder sb = new StringBuilder();
+
         sb.append("Order ID: ").append(orderID).append("\n");
         sb.append("Status: ").append(status).append("\n");
         sb.append("Total Amount: ").append(String.format("%.2f", totalAmount)).append("\n");
         sb.append("Items:\n");
 
         for (CartItem item : items) {
-            sb.append(" - ").append(item.toString()).append("\n");
+            sb.append(" - ").append(item).append("\n");
         }
 
         return sb.toString();
     }
 
     /**
-     * Compares this order to another object for equality.
-     * Two orders are equal if they have the same orderID.
+     * Determines if this order is equal to another object.
+     * Equality is based solely on the orderID.
      *
-     * @param obj the object to compare to
-     * @return true if obj is an Order with the same orderID, false otherwise
+     * @param obj the object being compared
+     * @return true if obj is an Order with the same orderID
      */
     @Override
     public boolean equals(Object obj) {
-        if (this == obj){
+        if (this == obj)
             return true;
-        }
+
         if (obj instanceof Order) {
-            return orderID == ((Order) obj).orderID;
+            return this.orderID == ((Order) obj).orderID;
         }
+
         return false;
+    }
+
+    // ------------------------------------------------------------------------
+    // Getters (Optional — add if needed)
+    // ------------------------------------------------------------------------
+
+    public int getOrderID() {
+        return orderID;
+    }
+
+    public List<CartItem> getItems() {
+        return new ArrayList<>(items);
+    }
+
+    public double getTotalAmount() {
+        return totalAmount;
+    }
+
+    public OrderStatus getStatus() {
+        return status;
     }
 }

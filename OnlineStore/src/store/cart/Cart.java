@@ -65,6 +65,16 @@ public class Cart {
 
 
     /**
+     * Returns a copy of the list of cart items.
+     * This prevents external code from modifying the internal list directly.
+     *
+     * @return a new List containing all CartItem objects in the cart
+     */
+    public List<CartItem> getItems() {
+        return new ArrayList<>(items);
+    }
+
+    /**
      * Removes a product from the cart.
      * If the product is found, its corresponding CartItem is removed.
      *
