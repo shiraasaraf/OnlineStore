@@ -93,6 +93,27 @@ public class ElectronicsProduct extends Product{
                 "Brand: " + getBrand();
     }
 
-    //equals Implemented in parent class
+    /**
+     * Checks whether this electronics product is equal to another object.
+     *
+     * Two ElectronicsProduct objects are considered equal if:
+     * 1. Both objects are instances of ElectronicsProduct.
+     * 2. The Product fields (name and category) are equal, based on super.equals(o).
+     * 3. They have the same brand.
+     *
+     * @param o the object to compare with this electronics product
+     * @return true if both objects represent the same electronics product;
+     *         false otherwise
+     */
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (!(o instanceof ElectronicsProduct)) return false;
 
+        if (!super.equals(o)) return false; // name + category
+
+        ElectronicsProduct other = (ElectronicsProduct) o;
+        return java.util.Objects.equals(this.brand, other.brand);
+    }
 }
+

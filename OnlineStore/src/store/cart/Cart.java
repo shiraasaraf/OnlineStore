@@ -5,35 +5,135 @@
  */
 
 package store.cart;
+
 import store.products.Product;
+
+import java.util.ArrayList;
 import java.util.List;
 
-
+/**
+ * Represents a shopping cart that holds a collection of CartItem objects.
+ * The cart allows adding products, removing products, clearing all items,
+ * calculating the total price, and checking whether it is empty.
+ */
 public class Cart {
 
+    //data member
     private List<CartItem> items;
 
+    /**
+     * Constructs a new empty Cart.
+     * Initializes the internal list used to store CartItem objects.
+     */
+    public Cart() {
+
+        this.items = new ArrayList<>(); //Building an empty list as default
+
+    }
+
+    //-------------------------------------------------------------------------------------------
+
+    /**
+     * Adds a product to the cart.
+     * If the product already exists in the cart, its quantity is increased.
+     * If it does not exist, a new CartItem is created and added.
+     *
+     * @param p        the product to add
+     * @param quantity the quantity to add (must be positive)
+     * @return true if the item was added or updated, false if the input was invalid
+     */
     public boolean addItem(Product p, int quantity){
-        //TODO implements
-        return false;
 
+        //Integrity check
+        if(p == null || quantity <= 0) return false;
+
+        // Check if the product is already in the cart
+        for (CartItem item : items) {
+            if(item.getProduct().equals(p)) {
+                int newQuantity = item.getQuantity() + quantity; //if so, increase its quantity
+                item.setQuantity(newQuantity);
+                return true;
+            }
+        }
+
+        //if product not found add as a new cart item
+        CartItem newItem = new CartItem(p, quantity);
+        //add it to the cart
+        items.add(newItem);
+        return true;
     }
 
+
+    /**
+     * Removes a product from the cart.
+     * If the product is found, its corresponding CartItem is removed.
+     *
+     * @param p the product to remove
+     * @return true if the product was removed, false if it was not found or invalid
+     */
     public boolean removeItem(Product p){
-        //TODO implements
-        return false;
+        if(p == null) return false;
+
+        for (int i = 0; i < items.size(); i++) {
+            CartItem item = items.get(i);
+
+            if (item.getProduct().equals(p)) {
+                items.remove(i); //remove by index
+                return true;
+            }
+        }
+        return false; //if not found
     }
 
+    /**
+     * Calculates the total price of all items in the cart.
+     * Each CartItem computes its own total price (price × quantity).
+     *
+     * @return the total cost of all items in the cart
+     */
     public double calculateTotal(){
-        //TODO implements
-        return 0;
-    }
-    public void clear(){
-        //TODO implements
+        double total = 0.0;
+
+        for (CartItem item: items) {
+            total += item.getTotalPrice(); //delegation to cartItem
+        }
+
+        return total;
     }
 
-    //Checking if there are items in the cart. used for check-out in Customer
+    /**
+     * Clears all items from the cart, leaving it empty.
+     */
+    public void clear(){
+        items.clear();  //Built Method
+    }
+
+    /**
+     * Determines whether the cart contains no items.
+     *
+     * @return true if the cart is empty, false otherwise
+     */
     public boolean isEmpty(){
         return items.isEmpty();
     }
+
+    //todo:equal
+
+    /**
+     * Returns a string representation of this cart.
+     * The string contains all cart items and their quantities.
+     *
+     * @return a string describing the contents of the cart
+     */
+    @Override
+    public String toString() {
+        return "Cart \n" +
+                "Items: " + items;
+    }
+
+
+    //Note: equals is not implemented for Cart. because it's a mutable structure (items change over time)
+    //implementing equals for mutable collections may lead to incorrect behavior,
+    //and it seems unnecessary, so it is intentionally omitted for now
+
 }

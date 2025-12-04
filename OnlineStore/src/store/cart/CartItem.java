@@ -58,7 +58,7 @@ public class CartItem {
      *
      * @return the product
      */
-    public Product getProduct() { return  product;}
+    public Product getProduct() { return  product; }
 
     /**
      * Returns the quantity of this cart item.

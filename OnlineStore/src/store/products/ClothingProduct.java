@@ -73,6 +73,28 @@ public class ClothingProduct extends Product {
                 "Size: " + getSize();
     }
 
-    //equals Implemented in parent class
 
+    /**
+     * Checks whether this clothing product is equal to another object.
+     *
+     * Two ClothingProduct objects are considered equal if:
+     * 1. Both objects are instances of ClothingProduct.
+     * 2. The Product fields (name and category) are equal, using super.equals(o).
+     * 3. They have the same size.
+     *
+     * @param o the object to compare with this clothing product
+     * @return true if both objects represent the same clothing product;
+     *         false otherwise
+     */
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (!(o instanceof ClothingProduct)) return false;
+
+        if (!super.equals(o)) return false;
+
+        ClothingProduct other = (ClothingProduct) o;
+
+        return java.util.Objects.equals(this.size, other.size);
+    }
 }

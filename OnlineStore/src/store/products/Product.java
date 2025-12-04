@@ -8,7 +8,7 @@ package store.products;
 import store.core.StoreEntity;
 import store.core.Persistable;
 import java.awt.Color;
-import java.util.Objects;
+
 
 
 /**
@@ -272,22 +272,32 @@ public abstract class Product implements StoreEntity, PricedItem, StockManageabl
     }
 
     /**
-     * Compares two products for equality.
-     * Products are equal if they have the same name and the same category.
+     * Checks whether this product is equal to another object.
      *
-     * @param o the object to compare with
-     * @return true if the products are equal, false otherwise
+     * Two Product objects are considered equal if:
+     * 1. They are from the exact same class (same getClass()).
+     * 2. They have the same name.
+     * 3. They belong to the same category.
+     *
+     * This method compares only the fields defined in Product.
+     * Subclass-specific fields are not included here.
+     *
+     * @param o the object to compare with this product
+     * @return true if both products have the same class, name, and category;
+     *         false otherwise
      */
     @Override
     public boolean equals(Object o) {
 
         if (this == o) return true;  //if it's the same object
 
-        if (!(o instanceof Product)) return false; //check the instance
+        if (!(o == null || getClass() != o.getClass())){ //check specific class belonging (not general instance)
+            return false;
+        }
 
         Product other = (Product) o; //casting to Product
 
-        return Objects.equals(this.name, other.name) && //compare
+        return java.util.Objects.equals(this.name, other.name) && //compare
                 this.category == other.category;
     }
 

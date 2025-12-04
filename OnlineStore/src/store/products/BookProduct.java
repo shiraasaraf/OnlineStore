@@ -94,6 +94,30 @@ public class BookProduct extends Product {
                 "Pages: " + getPages();
     }
 
-    //equals Implemented in parent class
+
+    /**
+     * Checks whether this book product is equal to another object.
+     *
+     * Two BookProduct objects are considered equal if:
+     * 1. They are both instances of BookProduct.
+     * 2. The Product fields (name and category) are equal, as checked by super.equals(o).
+     * 3. They have the same author.
+     *
+     * @param o the object to compare with this book product
+     * @return true if both objects represent the same book product;
+     *         false otherwise
+     */
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;                  // same object
+
+        if (!(o instanceof BookProduct)) return false; // not the same class
+
+        if (!super.equals(o)) return false;          // name + category checking (by father)
+
+        BookProduct other = (BookProduct) o;
+        return java.util.Objects.equals(this.author, other.author); //checking author
+    }
+
 
 }
