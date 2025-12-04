@@ -117,7 +117,7 @@ public class Cart {
         return items.isEmpty();
     }
 
-    //todo:equal
+    //------------------------------------------------------------------------------------------------
 
     /**
      * Returns a string representation of this cart.
