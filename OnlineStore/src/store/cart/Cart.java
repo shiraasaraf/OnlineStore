@@ -137,9 +137,20 @@ public class Cart {
      */
     @Override
     public String toString() {
-        return "Cart \n" +
-                "Items: " + items;
+        StringBuilder sb = new StringBuilder("Cart\n");
+
+        if (items.isEmpty()) {
+            sb.append("Items: (empty)\n");
+        } else {
+            sb.append("Items:\n");
+            for (CartItem item : items) {
+                sb.append(item).append("\n\n"); // space between products
+            }
+        }
+
+        return sb.toString();
     }
+
 
 
     //Note: equals is not implemented for Cart. because it's a mutable structure (items change over time)
