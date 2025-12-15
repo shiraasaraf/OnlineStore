@@ -2,4 +2,4 @@
 *.class
 
 # Ignore build output directory
-out/
+OnlineStore/out/
