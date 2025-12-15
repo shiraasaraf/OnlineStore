@@ -268,7 +268,7 @@ public abstract class Product implements StoreEntity, PricedItem, StockManageabl
         return "Name: " + getName() + "\n" +
                 "Price: " + getPrice() + "\n" +
                 "Category: " + getCategory() + "\n" +
-                "Stock: " + getStock();
+                "Stock: " + getStock() ;
     }
 
     /**
@@ -291,7 +291,7 @@ public abstract class Product implements StoreEntity, PricedItem, StockManageabl
 
         if (this == o) return true;  //if it's the same object
 
-        if (!(o == null || getClass() != o.getClass())){ //check specific class belonging (not general instance)
+        if (o == null || getClass() != o.getClass()){ //check specific class belonging (not general instance)
             return false;
         }
 
