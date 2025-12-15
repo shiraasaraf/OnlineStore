@@ -1,5 +1,4 @@
-# Ignore compiled class files
+/out/
+/build/
 *.class
-
-# Ignore build output directory
-OnlineStore/out/
+.idea/
