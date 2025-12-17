@@ -1,6 +1,7 @@
 package store.gui.view;
 
 
+import store.cart.CartItem;
 import store.products.Product;
 
 import javax.swing.*;
@@ -24,15 +25,15 @@ public class CartPanel extends JPanel {
         add(totalLabel, BorderLayout.SOUTH);
     }
 
-    public void updateCart(List<Product> products) {
+    public void updateCart(List<CartItem> items) {
         cartArea.setText("");
         double total = 0.0;
 
-        for (Product p : products) {
+        for (CartItem item : items) {
             cartArea.append(
-                    p.getDisplayName() + " - " + p.getPrice() + "₪\n"
+                    item.getQuantity() + " " + item.getProduct() + " - " + item.getTotalPrice() + "₪\n"
             );
-            total += p.getPrice();
+            total += item.getTotalPrice();
         }
 
         totalLabel.setText("Total: " + total + "₪");

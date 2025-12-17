@@ -71,7 +71,7 @@ public class StoreWindow extends JFrame {
             boolean success = controller.addToCart(product, 1);
 
             if (success) {
-                //TODO cartPanel.updateCart(controller.getCartProducts());
+                cartPanel.updateCart(controller.getItems());
                 JOptionPane.showMessageDialog(
                         this,
                         "Product added to the cart",

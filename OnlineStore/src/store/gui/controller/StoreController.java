@@ -1,5 +1,7 @@
 package store.gui.controller;
 import java.util.List;
+
+import store.cart.CartItem;
 import store.engine.*;
 import store.core.*;
 import store.products.*;
@@ -24,7 +26,9 @@ public class StoreController {
         return customer.addToCart(p, quantity);
     }
 
-   //TODO public List<Product> getCartProducts() {}
+    public List<CartItem> getItems() {
+        return customer.getItems();
+    }
 
     //בהמשך לשקול אם נהיה עמוס לפצל-  להוסיף מחלקות נוספות בcontroller:
     //StoreController  אירועים, הפעלת מודל, עדכון וויוז

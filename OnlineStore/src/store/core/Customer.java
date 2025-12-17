@@ -6,6 +6,7 @@
 
 package store.core;
 
+import store.cart.CartItem;
 import store.products.Product;
 import store.cart.Cart;
 import store.order.Order;
@@ -53,13 +54,9 @@ public class Customer extends User {
      */
     public Cart getCart() { return cart; }
 
-    //TODO getCartProducts()
-//    public List<Product> getCartProducts() {
-//        List<Product> products = new ArrayList<>();
-//        for (Order order : orderHistory) {
-//
-//        }
-//    }
+    public List<CartItem> getItems(){
+        return cart.getItems();
+    }
 
     /**
      * Returns a copy of the customer's order history.
