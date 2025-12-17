@@ -53,6 +53,13 @@ public class Customer extends User {
      */
     public Cart getCart() { return cart; }
 
+    //TODO getCartProducts()
+//    public List<Product> getCartProducts() {
+//        List<Product> products = new ArrayList<>();
+//        for (Order order : orderHistory) {
+//
+//        }
+//    }
 
     /**
      * Returns a copy of the customer's order history.
