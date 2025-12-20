@@ -39,13 +39,14 @@ public class ProductDetailsPanel extends JPanel {
 
         //description
         descriptionArea = new JTextArea();
-        descriptionArea.setText(product.getDescription());
+        descriptionArea.setText(""); // ✅ לא ניגשים ל-product בבנאי
         descriptionArea.setLineWrap(true);
         descriptionArea.setWrapStyleWord(true);
         descriptionArea.setEditable(false);
         descriptionArea.setRows(6);
 
         add(new JScrollPane(descriptionArea));
+
 
         add(Box.createVerticalStrut(8));
 

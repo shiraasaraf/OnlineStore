@@ -9,13 +9,14 @@ import store.products.*;
 
 public class StoreController {
 
-    private StoreEngine engine;
-    private Customer customer;
+    private final StoreEngine engine;
+    private final Customer customer;
+    private final Manager manager;
 
-
-    public StoreController(StoreEngine engine, Customer customer) {
+    public StoreController(StoreEngine engine, Customer customer, Manager manager) {
         this.engine = engine;
         this.customer = customer;
+        this.manager = manager;
     }
 
     public List<Product> getAvailableProducts() {
@@ -30,11 +31,8 @@ public class StoreController {
         return customer.getItems();
     }
 
-    //בהמשך לשקול אם נהיה עמוס לפצל-  להוסיף מחלקות נוספות בcontroller:
-    //StoreController  אירועים, הפעלת מודל, עדכון וויוז
-    //
-    //CatalogController (אופציונלי) – אם נהיה גדול מדי
-    //
-    //IOController או FileActionsController (אופציונלי) – רק לשמור על סדר
+    public boolean canManage() {
+        return manager != null;
+    }
 
 }
