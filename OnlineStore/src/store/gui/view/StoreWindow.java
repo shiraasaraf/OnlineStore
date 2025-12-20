@@ -75,7 +75,7 @@ public class StoreWindow extends JFrame {
             boolean success = controller.addToCart(p, quantity);
 
             if (success) {
-                cartPanel.updateCart(controller.getItems());
+                cartPanel.setItems(controller.getItems());
                 detailsPanel.showAddedFeedback(); //פידבק שנעלם אחרי שניה
                 detailsPanel.setProduct(p); // לרענון stock אם ירד
             } else {

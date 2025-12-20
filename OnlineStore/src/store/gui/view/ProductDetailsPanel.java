@@ -91,7 +91,7 @@ public class ProductDetailsPanel extends JPanel {
         nameLabel.setText("Name: " + product.getDisplayName());
         priceLabel.setText("Price: $" + product.getPrice());
         stockLabel.setText("Stock: " + product.getStock());
-        //ס? הוא אופרטור טרנרי - ביטוי מקוצר לIF. אם התיאור של המוצר הוא null - תוחזר מחרוזת ריקה, אחרת יוחזר הערך שלו
+        //אופרטור טרנרי - ביטוי מקוצר לIF. אם התיאור של המוצר הוא null - תוחזר מחרוזת ריקה, אחרת יוחזר הערך שלו
         descriptionArea.setText(product.getDescription() == null ? "" : product.getDescription());
         descriptionArea.setCaretPosition(0);
 
@@ -123,7 +123,7 @@ public class ProductDetailsPanel extends JPanel {
     // הכמות שהמשתמש בחר (ה-Controller ישתמש בזה)
     public int getSelectedQuantity() {
         Object v = quantitySpinner.getValue();
-        //? הוא אופרטור טרנרי - ביטוי מקוצר לIF. אם V הוא מסוג אינטג'ר- יוחזר הערך שלו, אם לא- יוחזר 1
+        //אופרטור טרנרי - ביטוי מקוצר לIF. אם V הוא מסוג אינטג'ר- יוחזר הערך שלו, אם לא- יוחזר 1
         return (v instanceof Integer) ? (Integer) v : 1;
     }
 
