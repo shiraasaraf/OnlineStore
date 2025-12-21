@@ -2,6 +2,8 @@ package store.gui.view;
 
 import store.gui.controller.StoreController;
 import store.products.Product;
+import store.products.Category;
+
 
 import javax.swing.*;
 import java.awt.*;
@@ -24,6 +26,12 @@ public class StoreWindow extends JFrame {
     private final JButton manageCatalogButton;
 
     private final JButton historyButton;
+    // Search + filter
+    private final JTextField searchField = new JTextField(18);
+    private final JButton clearSearchButton = new JButton("Clear");
+
+    private final JComboBox<Object> categoryCombo = new JComboBox<>();
+
 
 
     public StoreWindow(StoreController storeController) {
@@ -33,6 +41,8 @@ public class StoreWindow extends JFrame {
         setTitle("Online Store");
         setSize(1000, 650);
         setDefaultCloseOperation(EXIT_ON_CLOSE);
+        setExtendedState(JFrame.MAXIMIZED_BOTH);
+
         setLayout(new BorderLayout(10, 10));
 
         // Top bar: title + buttons
@@ -51,7 +61,9 @@ public class StoreWindow extends JFrame {
         manageCatalogButton.setEnabled(isManager);
         loadButton.setEnabled(isManager);
         saveButton.setEnabled(isManager);
-        historyButton.setEnabled(isManager);
+
+        //history also for customer
+        historyButton.setEnabled(true);
 
 
         // ---- Load button ----
@@ -132,6 +144,39 @@ public class StoreWindow extends JFrame {
 
 
         topBar.add(ioButtons, BorderLayout.EAST);
+
+        // -------- Search + Category Filter bar --------
+        JPanel filtersBar = new JPanel(new FlowLayout(FlowLayout.LEFT));
+
+        filtersBar.add(new JLabel("Search:"));
+        filtersBar.add(searchField);
+        filtersBar.add(clearSearchButton);
+
+        filtersBar.add(Box.createHorizontalStrut(15));
+        filtersBar.add(new JLabel("Category:"));
+        filtersBar.add(categoryCombo);
+
+        topBar.add(filtersBar, BorderLayout.CENTER);
+
+        // live search
+        searchField.getDocument().addDocumentListener(new javax.swing.event.DocumentListener() {
+            private void apply() { applyFilters(); }
+            @Override public void insertUpdate(javax.swing.event.DocumentEvent e) { apply(); }
+            @Override public void removeUpdate(javax.swing.event.DocumentEvent e) { apply(); }
+            @Override public void changedUpdate(javax.swing.event.DocumentEvent e) { apply(); }
+        });
+
+        // clear button
+        clearSearchButton.addActionListener(e -> {
+            searchField.setText("");
+            categoryCombo.setSelectedIndex(0); // All
+            applyFilters();
+        });
+
+        // category change
+        categoryCombo.addActionListener(e -> applyFilters());
+
+
         add(topBar, BorderLayout.NORTH);
 
         // Catalog Center
@@ -198,7 +243,7 @@ public class StoreWindow extends JFrame {
         });
 
         // initial catalog
-        setCatalogProducts(controller.getAvailableProducts());
+        refreshFiltersAfterCatalogChange();
     }
 
 
@@ -223,4 +268,61 @@ public class StoreWindow extends JFrame {
         catalogPanel.revalidate();
         catalogPanel.repaint();
     }
+
+    private void rebuildCategoryCombo(List<Product> products) {
+        categoryCombo.removeAllItems();
+        categoryCombo.addItem("All");
+
+        java.util.Set<Category> categories = new java.util.TreeSet<>(
+                java.util.Comparator.comparing(Enum::name)
+        );
+
+        for (Product p : products) {
+            if (p == null || p.getCategory() == null) continue;
+            categories.add(p.getCategory());
+        }
+
+        for (Category c : categories) {
+            categoryCombo.addItem(c);
+        }
+    }
+
+    private void applyFilters() {
+        String text = searchField.getText() == null
+                ? ""
+                : searchField.getText().trim().toLowerCase();
+
+        Object selected = categoryCombo.getSelectedItem();
+
+        List<Product> all = controller.getAvailableProducts();
+        java.util.List<Product> filtered = new java.util.ArrayList<>();
+
+        for (Product p : all) {
+            if (p == null) continue;
+
+            String name = p.getName() == null ? "" : p.getName();
+
+            boolean matchName =
+                    text.isEmpty() ||
+                            name.toLowerCase().contains(text);
+
+            boolean matchCategory =
+                    selected == null ||
+                            "All".equals(selected) ||
+                            p.getCategory() == selected;
+
+            if (matchName && matchCategory) {
+                filtered.add(p);
+            }
+        }
+
+        setCatalogProducts(filtered);
+    }
+
+    private void refreshFiltersAfterCatalogChange() {
+        rebuildCategoryCombo(controller.getAvailableProducts());
+        applyFilters();
+    }
+
+
 }
