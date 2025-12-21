@@ -2,16 +2,8 @@
  * Submitted by:
  * Tamar Nahum, ID 021983812
  * Shira Asaraf, ID 322218439
- *
- *
- *
- * Application entry point.
- * <p>
- * Initializes the store engine, loads a default product catalog if available,
- * and launches the GUI login window.
- * </p>
- *
  */
+
 package store.app;
 
 import store.core.Customer;
@@ -30,6 +22,12 @@ import java.util.List;
 
 /**
  * Main application class.
+ * Application entry point.
+ * <p>
+ * Initializes the store engine, loads a default product catalog if available,
+ * and launches the GUI login window.
+ * </p>
+ *
  */
 public class Main {
 

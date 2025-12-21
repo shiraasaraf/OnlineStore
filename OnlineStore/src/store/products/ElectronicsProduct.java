@@ -7,83 +7,76 @@
 package store.products;
 
 import java.awt.Color;
+import java.util.Objects;
 
 /**
- * Represents an electronic product in the store.
- * Extends {@link Product} by adding electronic-specific fields:
- * warranty period (in months) and brand name.
- *
- * All validation and default values ensure that the object is always
- * created in a valid state. Warranty must be a positive number, and
- * the brand cannot be null or empty.
+ * Represents an electronics product.
+ * <p>
+ * Extends {@link Product} with electronics-specific fields such as
+ * warranty period and brand name.
+ * </p>
  */
-public class ElectronicsProduct extends Product{
+public class ElectronicsProduct extends Product {
 
+    /** Warranty period in months. */
     private int warrantMonths;
+
+    /** Brand name. */
     private String brand;
 
     /**
-     * Constructs a new ElectronicsProduct with validation.
-     * Invalid or null parameters are replaced with default values.
+     * Constructs a new electronics product.
      *
-     * @param name            product name (default if null or empty)
-     * @param price           product price (default if not positive)
-     * @param stock           initial stock (default if negative)
-     * @param description     product description (empty string if null)
-     * @param category        product category (default if null)
-     * @param color           product color (default if null)
-     * @param warrantMonths   warranty period in months (must be positive)
-     * @param brand           brand name (default if null or empty)
+     * @param name          product name
+     * @param price         product price
+     * @param stock         initial stock
+     * @param description   product description
+     * @param category      product category
+     * @param color         product color
+     * @param imagePath     relative image path
+     * @param warrantMonths warranty period in months
+     * @param brand         brand name
      */
     public ElectronicsProduct(String name, double price, int stock, String description,
-                              Category category, Color color, String imagePath, int warrantMonths, String brand){
+                              Category category, Color color, String imagePath,
+                              int warrantMonths, String brand) {
 
         super(name, price, stock, description, category, color, imagePath);
 
-        //default values
         this.warrantMonths = 1;
         this.brand = "Unknown brand";
 
-        // warrantMonths – must be positive
         if (warrantMonths > 0) {
             this.warrantMonths = warrantMonths;
         }
 
-        // brand – only if non-null and not blank
         if (brand != null && !brand.trim().isEmpty()) {
             this.brand = brand;
         }
-
     }
 
-    //---------------------------------------------------------------------------------------------
-
     /**
-     * Returns the warranty period of this product, in months.
+     * Returns the warranty period.
      *
      * @return warranty duration in months
      */
     public int getWarrantMonths() {
-        return this.warrantMonths;
+        return warrantMonths;
     }
 
     /**
-     * Returns the brand of this electronic product.
+     * Returns the product brand.
      *
-     * @return the brand name
+     * @return brand name
      */
     public String getBrand() {
-        return this.brand;
+        return brand;
     }
 
-    //---------------------------------------------------------------------------------------------
-
     /**
-     * Returns a multi-line string describing this electronic product,
-     * including general product details and electronics-specific fields
-     * such as warranty and brand.
+     * Returns a string representation of this electronics product.
      *
-     * @return string representation of this electronic product
+     * @return electronics product details
      */
     @Override
     public String toString() {
@@ -94,26 +87,18 @@ public class ElectronicsProduct extends Product{
     }
 
     /**
-     * Checks whether this electronics product is equal to another object.
+     * Compares this electronics product to another object.
      *
-     * Two ElectronicsProduct objects are considered equal if:
-     * 1. Both objects are instances of ElectronicsProduct.
-     * 2. The Product fields (name and category) are equal, based on super.equals(o).
-     * 3. They have the same brand.
-     *
-     * @param o the object to compare with this electronics product
-     * @return true if both objects represent the same electronics product;
-     *         false otherwise
+     * @param o the object to compare
+     * @return true if equal, false otherwise
      */
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
         if (!(o instanceof ElectronicsProduct)) return false;
-
-        if (!super.equals(o)) return false; // name + category
+        if (!super.equals(o)) return false;
 
         ElectronicsProduct other = (ElectronicsProduct) o;
-        return java.util.Objects.equals(this.brand, other.brand);
+        return Objects.equals(this.brand, other.brand);
     }
 }
-
