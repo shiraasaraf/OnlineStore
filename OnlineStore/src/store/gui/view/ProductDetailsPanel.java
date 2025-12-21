@@ -2,136 +2,198 @@ package store.gui.view;
 
 import store.products.Product;
 
+import javax.imageio.ImageIO;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ActionListener;
+import java.awt.image.BufferedImage;
+import java.io.IOException;
+import java.net.URL;
 
+/**
+ * A Swing panel that displays details of the currently selected product.
+ * <p>
+ * Displays the product name, description, price, stock amount, product image,
+ * and an "Add to Cart" button.
+ * </p>
+ */
 public class ProductDetailsPanel extends JPanel {
 
     private Product product;
 
-    //Components that will be updated when we replace a product
-    private JLabel nameLabel;
-    private JLabel priceLabel;
-    private JLabel stockLabel;
+    // UI components
+    private final JLabel imageLabel = new JLabel();
+    private final JLabel nameLabel = new JLabel();
+    private final JLabel priceLabel = new JLabel();
+    private final JLabel stockLabel = new JLabel();
 
-    private JTextArea descriptionArea;
-    private JButton addToCartButton;
+    private JLabel descriptionLabel;
+    private final JButton addToCartButton = new JButton("Add to Cart");
+    private final JLabel feedbackLabel = new JLabel(" ");
 
-    private JSpinner quantitySpinner;
-    private JLabel feedbackLabel;
+    // Image display size (match your product tile proportions)
+    private static final int IMG_W = 169;
+    private static final int IMG_H = 219;
 
     public ProductDetailsPanel(Product product) {
-
         setLayout(new BoxLayout(this, BoxLayout.Y_AXIS));
         setBorder(BorderFactory.createTitledBorder("Product Details"));
 
-        //labels
-        nameLabel = new JLabel();
-        priceLabel = new JLabel();
-        stockLabel = new JLabel();
+        // image
+        imageLabel.setHorizontalAlignment(SwingConstants.CENTER);
+        imageLabel.setPreferredSize(new Dimension(IMG_W, IMG_H));
+        imageLabel.setMinimumSize(new Dimension(IMG_W, IMG_H));
+        imageLabel.setMaximumSize(new Dimension(IMG_W, IMG_H));
+        imageLabel.setOpaque(true);
+        imageLabel.setBackground(Color.WHITE);
 
+        add(imageLabel);
+        add(Box.createVerticalStrut(8));
+
+        // labels
         add(nameLabel);
         add(priceLabel);
         add(stockLabel);
 
         add(Box.createVerticalStrut(8));
 
-        //description
-        descriptionArea = new JTextArea();
-        descriptionArea.setText(""); // ✅ לא ניגשים ל-product בבנאי
-        descriptionArea.setLineWrap(true);
-        descriptionArea.setWrapStyleWord(true);
-        descriptionArea.setEditable(false);
-        descriptionArea.setRows(6);
+        // description
+        descriptionLabel = new JLabel();
+        descriptionLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
 
-        add(new JScrollPane(descriptionArea));
+        // מאפשר עטיפת שורות ל־JLabel
+        descriptionLabel.setText("<html>Description: </html>");
 
+        add(descriptionLabel);
 
         add(Box.createVerticalStrut(8));
 
-        // quantity selector + add-to-cart button (horizontal row)
-        JPanel bottomRow = new JPanel(new FlowLayout (FlowLayout.LEFT));
-        bottomRow.add(new JLabel("Quantity:"));
-
-        quantitySpinner = new JSpinner(new SpinnerNumberModel(1, 1, 1, 1));
-        bottomRow.add(quantitySpinner);
-
-        addToCartButton = new JButton("Add to Cart");
+        // add-to-cart button (quantity moved to cart)
+        JPanel bottomRow = new JPanel(new FlowLayout(FlowLayout.LEFT));
         bottomRow.add(addToCartButton);
-
         add(bottomRow);
 
-        //feedback - empty label until item will be added to cart (timer will work)
-        feedbackLabel = new JLabel(" ");
+        // feedback message
         feedbackLabel.setForeground(new Color(0, 128, 0));
         add(feedbackLabel);
 
-        //set initial product (updates UI)
+        // init
         setProduct(product);
     }
 
-    //allows to replace a product without rebuilding a panel
+    /**
+     * Replaces the currently displayed product and refreshes the UI.
+     *
+     * @param product the product to display (may be {@code null})
+     */
     public void setProduct(Product product) {
         this.product = product;
         refreshView();
     }
 
-    private void refreshView() {
-        if (product == null) {
-            nameLabel.setText("Name: -");
-            priceLabel.setText("Price: -");
-            stockLabel.setText("Stock: - ");
-            descriptionArea.setText("");
-            addToCartButton.setEnabled(false);
-            quantitySpinner.setModel(new SpinnerNumberModel(0, 0, 0, 0));
-            return;
-        }
-
-        nameLabel.setText("Name: " + product.getDisplayName());
-        priceLabel.setText("Price: $" + product.getPrice());
-        stockLabel.setText("Stock: " + product.getStock());
-        //אופרטור טרנרי - ביטוי מקוצר לIF. אם התיאור של המוצר הוא null - תוחזר מחרוזת ריקה, אחרת יוחזר הערך שלו
-        descriptionArea.setText(product.getDescription() == null ? "" : product.getDescription());
-        descriptionArea.setCaretPosition(0);
-
-
-        int stock = product.getStock();
-
-        //כפתור להוספת כמות ממוצר יופעל אם יש סטוק
-        if (stock > 0) {
-            addToCartButton.setEnabled(true);
-            quantitySpinner.setModel(new SpinnerNumberModel(1, 1, stock, 1));
-        } else {
-            addToCartButton.setEnabled(false);
-            quantitySpinner.setModel(new SpinnerNumberModel(0, 0, 0, 0));
-        }
-
-        feedbackLabel.setText(" ");
-    }
-
-
-    public void addAddToCartListener(ActionListener listener) {
-        addToCartButton.addActionListener(listener);
-    }
-
-
+    /**
+     * Returns the currently displayed product.
+     *
+     * @return the current product (may be {@code null})
+     */
     public Product getProduct() {
         return product;
     }
 
-    // הכמות שהמשתמש בחר (ה-Controller ישתמש בזה)
-    public int getSelectedQuantity() {
-        Object v = quantitySpinner.getValue();
-        //אופרטור טרנרי - ביטוי מקוצר לIF. אם V הוא מסוג אינטג'ר- יוחזר הערך שלו, אם לא- יוחזר 1
-        return (v instanceof Integer) ? (Integer) v : 1;
+    /**
+     * Registers a listener for the "Add to Cart" button.
+     *
+     * @param listener the action listener to register
+     */
+    public void addAddToCartListener(ActionListener listener) {
+        addToCartButton.addActionListener(listener);
     }
 
-    // להציג הודעה אחרי שה-Controller הצליח להוסיף לעגלה
+    /**
+     * Shows a short feedback message after a successful add-to-cart action.
+     */
     public void showAddedFeedback() {
         feedbackLabel.setText("Added to cart!");
         Timer t = new Timer(1000, e -> feedbackLabel.setText(" "));
         t.setRepeats(false);
         t.start();
+    }
+
+    // --- internal UI update ---
+
+    private void refreshView() {
+        if (product == null) {
+            nameLabel.setText("Name: -");
+            priceLabel.setText("Price: -");
+            stockLabel.setText("Stock: -");
+            descriptionLabel.setText("Description: -");
+
+
+
+            imageLabel.setIcon(null);
+            imageLabel.setText("No Image");
+            imageLabel.setHorizontalTextPosition(SwingConstants.CENTER);
+            imageLabel.setVerticalTextPosition(SwingConstants.CENTER);
+
+            addToCartButton.setEnabled(false);
+            feedbackLabel.setText(" ");
+            return;
+        }
+
+        // text fields
+        nameLabel.setText("Name: " + product.getDisplayName());
+        priceLabel.setText("Price: " + product.getPrice() + "$");
+        stockLabel.setText("Stock: " + product.getStock());
+
+        String desc = product.getDescription() == null ? "" : product.getDescription();
+        descriptionLabel.setText("<html><b>Description:</b> " + desc + "</html>");
+
+        // image
+        loadProductImage();
+
+        // enable/disable add button
+        addToCartButton.setEnabled(product.getStock() > 0);
+
+        feedbackLabel.setText(" ");
+    }
+
+    private void loadProductImage() {
+        // התאימי לפי איך שאת שומרת נתיב תמונה במוצר
+        // אם אצלך זה getImagePath() – זה המצב הנפוץ אצלך בפרויקט
+        String path;
+        try {
+            path = product.getImagePath();
+        } catch (Exception e) {
+            path = null;
+        }
+
+        if (path == null || path.isBlank()) {
+            imageLabel.setIcon(null);
+            imageLabel.setText("No Image");
+            return;
+        }
+
+        URL url = getClass().getClassLoader().getResource(path);
+        if (url == null) {
+            imageLabel.setIcon(null);
+            imageLabel.setText("Image not found");
+            return;
+        }
+
+        try {
+            BufferedImage original = ImageIO.read(url);
+            if (original == null) {
+                imageLabel.setIcon(null);
+                imageLabel.setText("Invalid image");
+                return;
+            }
+
+            Image scaled = original.getScaledInstance(IMG_W, IMG_H, Image.SCALE_SMOOTH);
+            imageLabel.setText("");
+            imageLabel.setIcon(new ImageIcon(scaled));
+        } catch (IOException ex) {
+            imageLabel.setIcon(null);
+            imageLabel.setText("Image error");
+        }
     }
 }

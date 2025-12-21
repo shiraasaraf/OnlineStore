@@ -224,8 +224,9 @@ public class StoreWindow extends JFrame {
             Product p = detailsPanel.getProduct();
             if (p == null) return;
 
-            int quantity = detailsPanel.getSelectedQuantity();
+            int quantity = 1;
             boolean success = controller.addToCart(p, quantity);
+
 
             if (success) {
                 cartPanel.setItems(controller.getItems());
