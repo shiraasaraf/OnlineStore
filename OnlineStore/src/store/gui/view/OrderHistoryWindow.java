@@ -36,7 +36,7 @@ public class OrderHistoryWindow extends JDialog {
 
         // ----- Table -----
         tableModel = new DefaultTableModel(
-                new Object[]{"Order ID", "Total Amount", "Items"},
+                new Object[]{"Order ID", "Total Amount", "Created At", "Items"},
                 0
         ) {
             @Override
@@ -89,8 +89,10 @@ public class OrderHistoryWindow extends JDialog {
             tableModel.addRow(new Object[]{
                     o.getOrderID(),
                     String.format("%.2f", o.getTotalAmount()),
-                    itemsText
+                    o.getCreatedAt(),        // ככה הסדר נכון!
+                    buildItemsSummary(o)
             });
+
         }
     }
 

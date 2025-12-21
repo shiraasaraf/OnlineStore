@@ -58,6 +58,9 @@ public class Main {
                 }
             }
 
+            // BONUS: load existing orders history
+            engine.loadOrderHistoryFromFile();
+
             LoginWindow login = new LoginWindow();
 
             // Customer mode
@@ -83,6 +86,9 @@ public class Main {
                 login.dispose();
                 window.setVisible(true);
             });
+
+
+
 
             login.setVisible(true);
         });

@@ -66,6 +66,21 @@ public class StoreController {
         return engine.getAllOrders();
     }
 
+
+
+    /**
+     * Performs checkout for the current customer.
+     *
+     * @return true if checkout succeeded, false otherwise.
+     */
+    public boolean checkout() {
+        if (customer == null) {
+            return false;
+        }
+        return customer.checkout();
+    }
+
+
     // ---------------------------------------------------------------------
     // Cart (Customer)
     // ---------------------------------------------------------------------

@@ -211,6 +211,32 @@ public class StoreWindow extends JFrame {
             detailsPanel.setProduct(detailsPanel.getProduct());
         });
 
+        // Checkout button: perform order and show confirmation
+        cartPanel.addCheckoutListener(e -> {
+            boolean success = controller.checkout();
+
+            if (success) {
+                // העגלה התרוקנה – מרעננים תצוגה
+                cartPanel.setItems(controller.getItems());
+                setCatalogProducts(controller.getAvailableProducts());
+
+                JOptionPane.showMessageDialog(
+                        this,
+                        "Order completed successfully!",
+                        "Checkout",
+                        JOptionPane.INFORMATION_MESSAGE
+                );
+            } else {
+                JOptionPane.showMessageDialog(
+                        this,
+                        "Cart is empty. Add items before checkout.",
+                        "Checkout",
+                        JOptionPane.WARNING_MESSAGE
+                );
+            }
+        });
+
+
 
 
         rightPanel.add(detailsPanel);
