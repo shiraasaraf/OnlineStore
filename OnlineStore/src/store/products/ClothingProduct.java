@@ -7,64 +7,56 @@
 package store.products;
 
 import java.awt.Color;
+import java.util.Objects;
 
 /**
- * Represents a clothing product in the store.
- * Extends {@link Product} by adding a clothing-specific field: size.
- *
- * This class adds additional details relevant only to clothing products
- * while keeping general validation and behavior inside the parent class Product.
+ * Represents a clothing product.
+ * <p>
+ * Extends {@link Product} with a clothing-specific size attribute.
+ * </p>
  */
 public class ClothingProduct extends Product {
 
-    //data member
+    /** Clothing size. */
     private String size;
 
     /**
-     * Constructs a new ClothingProduct with validation.
-     * Invalid or null parameters are replaced with default values.
+     * Constructs a new clothing product.
      *
-     * @param name        product name (default if null or empty)
-     * @param price       product price (default if not positive)
-     * @param stock       initial stock (default if negative)
-     * @param description product description (empty string if null)
-     * @param category    product category (default if null)
-     * @param color       product color (default if null)
-     * @param size        clothing size (default if null or empty)
+     * @param name        product name
+     * @param price       product price
+     * @param stock       initial stock
+     * @param description product description
+     * @param category    product category
+     * @param color       product color
+     * @param imagePath   relative image path
+     * @param size        clothing size
      */
     public ClothingProduct(String name, double price, int stock, String description,
                            Category category, Color color, String imagePath, String size) {
 
-        super(name, price, stock, description, category, color, imagePath );
+        super(name, price, stock, description, category, color, imagePath);
 
-        //default value
         this.size = "Unknown size";
 
-        // size – only if non-null and not blank
         if (size != null && !size.trim().isEmpty()) {
             this.size = size.trim();
         }
-
     }
-
-    //-----------------------------------------------------------------------------------------
 
     /**
      * Returns the clothing size.
      *
-     * @return the size value
+     * @return the size
      */
     public String getSize() {
-        return this.size;
+        return size;
     }
 
-    //------------------------------------------------------------------------------------------
-
     /**
-     * Returns a multi-line string describing this clothing product,
-     * including all product details and the clothing-specific size field.
+     * Returns a string representation of this clothing product.
      *
-     * @return string representation of this clothing product
+     * @return clothing product details
      */
     @Override
     public String toString() {
@@ -73,28 +65,19 @@ public class ClothingProduct extends Product {
                 "Size: " + getSize();
     }
 
-
     /**
-     * Checks whether this clothing product is equal to another object.
+     * Compares this clothing product to another object.
      *
-     * Two ClothingProduct objects are considered equal if:
-     * 1. Both objects are instances of ClothingProduct.
-     * 2. The Product fields (name and category) are equal, using super.equals(o).
-     * 3. They have the same size.
-     *
-     * @param o the object to compare with this clothing product
-     * @return true if both objects represent the same clothing product;
-     *         false otherwise
+     * @param o the object to compare
+     * @return true if equal, false otherwise
      */
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
         if (!(o instanceof ClothingProduct)) return false;
-
         if (!super.equals(o)) return false;
 
         ClothingProduct other = (ClothingProduct) o;
-
-        return java.util.Objects.equals(this.size, other.size);
+        return Objects.equals(this.size, other.size);
     }
 }

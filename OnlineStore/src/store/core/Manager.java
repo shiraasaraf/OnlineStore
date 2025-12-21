@@ -1,14 +1,19 @@
 /**
+ * Submitted by:
+ * Tamar Nahum, ID 021983812
+ * Shira Asaraf, ID 322218439
+ */
+
+
+package store.core;
+
+/**
  * Represents a store manager (administrator) in the store system.
  * A manager is allowed to perform administrative actions such as
  * loading and saving products from/to files.
  */
-package store.core;
-
 public class Manager extends User {
 
-    // אפשר לשים שדות נוספים בהמשך (למשל role, employeeId וכו')
-    // כרגע אין צורך - רק ההבחנה בין מנהל ללקוח
 
     /**
      * Constructs a new Manager.
@@ -21,6 +26,11 @@ public class Manager extends User {
         super(username, email);
     }
 
+    /**
+     * Returns a string representation of the manager.
+     *
+     * @return manager details
+     */
     @Override
     public String toString() {
         return "Manager\n" + super.toString();

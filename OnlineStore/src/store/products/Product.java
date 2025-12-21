@@ -5,124 +5,124 @@
  */
 
 package store.products;
-import store.core.StoreEntity;
+
 import store.core.Persistable;
+import store.core.StoreEntity;
+
 import java.awt.Color;
-
-
+import java.util.Objects;
 
 /**
- * Abstract base class representing a generic product in the store.
- * Provides common fields such as name, price, stock, description, category
- * and color, and implements interfaces for display, pricing, stock management
- * and persistence.
+ * Abstract base class for store products.
+ * <p>
+ * Holds common product data (name, price, stock, description, category, color, image path)
+ * and provides basic validation and default values.
+ * </p>
  */
-public abstract class Product implements StoreEntity, PricedItem, StockManageable, Persistable   {
+public abstract class Product implements StoreEntity, PricedItem, StockManageable, Persistable {
 
-    //data members:
+    /** Product name. */
     private String name;
+
+    /** Product price (positive). */
     private double price;
+
+    /** Available stock (non-negative). */
     private int stock;
+
+    /** Product description (never {@code null}). */
     private String description;
+
+    /** Product category. */
     private Category category;
+
+    /** Product color. */
     private Color color;
+
+    /** Relative path to the product image in resources. */
     private String imagePath;
-    //path does not start with / . The path is relative to resources.
 
     /**
-     * Constructs a new Product and applies validation to all parameters.
-     * Invalid or null values are replaced with default values so the product
-     * is always created in a valid state.
+     * Creates a product with validated values and sensible defaults.
      *
-     * @param name        product name (default used if null or empty)
+     * @param name        product name (default used if null/blank)
      * @param price       product price (default used if not positive)
      * @param stock       initial stock (default used if negative)
      * @param description product description (empty string used if null)
      * @param category    product category (default used if null)
      * @param color       product color (default used if null)
+     * @param imagePath   relative image path (default used if null/blank)
      */
     public Product(String name, double price, int stock, String description,
                    Category category, Color color, String imagePath) {
 
-        //default values
         this.name = "Unknown product";
         this.price = 0.1;
         this.stock = 0;
         this.description = "";
-        this.category = Category.BOOKS; //Randomly selected because it must be from Category enum
-        this.color = Color.BLACK; //Randomly selected because it must be from Color class
-        this.imagePath = "images/default.jpg"; //default image
+        this.category = Category.BOOKS;
+        this.color = Color.BLACK;
+        this.imagePath = "images/default.jpg";
 
-        // name – only if non-null and not blank
         if (name != null && !name.trim().isEmpty()) {
             this.name = name;
         }
-
-        // category – only if non-null
         if (category != null) {
             this.category = category;
         }
-
-        // color – only if non-null
         if (color != null) {
             this.color = color;
         }
-
-        // imagePath
         if (imagePath != null && !imagePath.trim().isEmpty()) {
-        this.imagePath = imagePath.trim();
+            this.imagePath = imagePath.trim();
         }
 
-        // use setters so validation is centralized
-        setPrice(price);                // if invalid, keeps default price
-        setStock(stock);                // if invalid, keeps default stock
-        setDescription(description);    // if invalid, keeps default description
+        setPrice(price);
+        setStock(stock);
+        setDescription(description);
     }
-
-    //----------------------------------------------------------------------------------------------------
 
     /**
      * Returns the product name.
      *
-     * @return the product name
+     * @return the name
      */
     public String getName() {
-        return this.name;
+        return name;
     }
 
     /**
      * Returns the product description.
      *
-     * @return the product description (never null)
+     * @return the description (never null)
      */
     public String getDescription() {
-        return this.description;
+        return description;
     }
 
     /**
      * Returns the product category.
      *
-     * @return the product category
+     * @return the category
      */
     public Category getCategory() {
-        return this.category;
+        return category;
     }
 
     /**
      * Returns the product color.
      *
-     * @return the product color
+     * @return the color
      */
     public Color getColor() {
-        return this.color;
+        return color;
     }
 
     /**
-     * Sets the initial stock value.
-     * Used only inside the constructor.
+     * Sets the stock value.
      *
-     * @param stock stock value to set
-     * @return true if stock is valid and assigned, false otherwise
+     * @param stock the new stock
+     * @return true if assigned, false otherwise
      */
     private boolean setStock(int stock) {
         if (stock < 0) {
@@ -133,10 +133,10 @@ public abstract class Product implements StoreEntity, PricedItem, StockManageabl
     }
 
     /**
-     * Sets a new description if the value is not null.
+     * Sets the product description.
      *
-     * @param description new description
-     * @return true if description was assigned, false otherwise
+     * @param description the new description
+     * @return true if assigned, false otherwise
      */
     protected boolean setDescription(String description) {
         if (description == null) {
@@ -146,37 +146,30 @@ public abstract class Product implements StoreEntity, PricedItem, StockManageabl
         return true;
     }
 
-    //-------------------------------------------------------------------------------------
-
-    //implementation of interfaces:
-
-    //Persistable interface
     /**
      * Saves this product to a file.
-     * Currently unimplemented and handled in future assignments.
      *
-     * @param path path of the file to save into
+     * @param path destination path
      */
     @Override
-    public void saveToFile(String path) {} //Temporarily implemented empty
-
-    //interface StoreEntity
+    public void saveToFile(String path) {
+        // Not implemented in this version.
+    }
 
     /**
-     * Returns a short display name for UI purposes.
+     * Returns a short name for UI display.
      *
-     * @return a display-friendly name
+     * @return display name
      */
     @Override
-    public String getDisplayName(){
+    public String getDisplayName() {
         return getName();
     }
 
     /**
-     * Returns a detailed description for UI display,
-     * including name, price, category, description and color.
+     * Returns product details for UI display.
      *
-     * @return multi-line detailed product information
+     * @return multi-line details string
      */
     @Override
     public String getDisplayDetails() {
@@ -188,25 +181,21 @@ public abstract class Product implements StoreEntity, PricedItem, StockManageabl
                 "Image: " + getImagePath() + "\n";
     }
 
-    //-------------------------------------------------------------------------------------------
-
-    //interface PricedItem
-
     /**
      * Returns the product price.
      *
-     * @return the price of this product
+     * @return the price
      */
     @Override
-    public double getPrice(){
+    public double getPrice() {
         return price;
     }
 
     /**
-     * Sets a new product price if it is positive.
+     * Sets the product price.
      *
-     * @param price new price value
-     * @return true if assigned successfully, false otherwise
+     * @param price the new price
+     * @return true if assigned, false otherwise
      */
     @Override
     public boolean setPrice(double price) {
@@ -217,103 +206,83 @@ public abstract class Product implements StoreEntity, PricedItem, StockManageabl
         return true;
     }
 
-    //--------------------------------------------------------------------------------------------
-
-    //interface StockManageable
-
     /**
      * Returns the current stock.
      *
-     * @return the stock amount
+     * @return stock amount
      */
     @Override
     public int getStock() {
         return stock;
     }
 
-    //set the stock through these 2 methods:
-
     /**
-     * Increases stock by a positive amount.
+     * Increases stock by the given amount.
      *
-     * @param amount amount to increase
-     * @return true if updated successfully, false otherwise
+     * @param amount amount to add
+     * @return true if updated, false otherwise
      */
     @Override
     public boolean increaseStock(int amount) {
-        if (amount <= 0)
-                return false;
-        stock  = stock + amount;
+        if (amount <= 0) {
+            return false;
+        }
+        stock += amount;
         return true;
     }
 
     /**
-     * Decreases stock by a positive amount without going negative.
+     * Decreases stock by the given amount.
      *
-     * @param amount amount to decrease
-     * @return true if updated successfully, false otherwise
+     * @param amount amount to subtract
+     * @return true if updated, false otherwise
      */
     @Override
     public boolean decreaseStock(int amount) {
-        if (amount <= 0)
+        if (amount <= 0) {
             return false;
-        else if ((stock - amount) < 0)
+        }
+        if (stock - amount < 0) {
             return false;
-        stock = stock - amount;
+        }
+        stock -= amount;
         return true;
     }
 
-    //----------------------------------------------------------------------------------------------
-
-    //overrides must
-
     /**
-     * Returns a basic multi-line string describing the product.
+     * Returns a short textual representation of the product.
      *
-     * @return product information string
+     * @return product string
      */
     @Override
     public String toString() {
         return "Name: " + getName() + "\n" +
                 "Price: " + getPrice() + "\n" +
                 "Category: " + getCategory() + "\n" +
-                "Stock: " + getStock() ;
+                "Stock: " + getStock();
     }
 
     /**
-     * Checks whether this product is equal to another object.
+     * Compares products by class, name and category.
      *
-     * Two Product objects are considered equal if:
-     * 1. They are from the exact same class (same getClass()).
-     * 2. They have the same name.
-     * 3. They belong to the same category.
-     *
-     * This method compares only the fields defined in Product.
-     * Subclass-specific fields are not included here.
-     *
-     * @param o the object to compare with this product
-     * @return true if both products have the same class, name, and category;
-     *         false otherwise
+     * @param o the object to compare
+     * @return true if equal, false otherwise
      */
     @Override
     public boolean equals(Object o) {
-
-        if (this == o) return true;  //if it's the same object
-
-        if (o == null || getClass() != o.getClass()){ //check specific class belonging (not general instance)
-            return false;
-        }
-
-        Product other = (Product) o; //casting to Product
-
-        return java.util.Objects.equals(this.name, other.name) && //compare
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        Product other = (Product) o;
+        return Objects.equals(this.name, other.name) &&
                 this.category == other.category;
     }
 
+    /**
+     * Returns the image path.
+     *
+     * @return relative image path
+     */
     public String getImagePath() {
         return imagePath;
     }
-
 }
-
-

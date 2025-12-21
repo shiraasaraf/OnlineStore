@@ -4,120 +4,99 @@
  * Shira Asaraf, ID 322218439
  */
 
-
 package store.products;
 
 import java.awt.Color;
+import java.util.Objects;
 
 /**
- * Represents a book product in the store.
- * Extends {@link Product} by adding book-specific fields such as
- * author and number of pages.
- *
- * This class adds additional details relevant only to book products
- * while keeping all product validation and shared behavior in the
- * parent class Product.
+ * Represents a book product.
+ * <p>
+ * Extends {@link Product} with book-specific fields (author and page count).
+ * </p>
  */
 public class BookProduct extends Product {
 
-    //data members
+    /** Book author. */
     private String author;
+
+    /** Number of pages (positive). */
     private int pages;
 
-
     /**
-     * Constructs a new BookProduct with validation.
-     * Invalid or null parameters are replaced with default values.
+     * Constructs a new book product.
      *
-     * @param name        product name (default if null or empty)
-     * @param price       product price (default if not positive)
-     * @param stock       initial stock (default if negative)
-     * @param description product description (empty string if null)
-     * @param category    product category (default if null)
-     * @param color       product color (default if null)
-     * @param author      book author (default if null or empty)
-     * @param pages       number of pages (must be positive, otherwise default)
+     * @param name        product name
+     * @param price       product price
+     * @param stock       initial stock
+     * @param description product description
+     * @param category    product category
+     * @param color       product color
+     * @param imagePath   relative image path
+     * @param author      book author
+     * @param pages       number of pages
      */
     public BookProduct(String name, double price, int stock, String description, Category category,
-                       Color color, String imagePath , String author, int pages){
+                       Color color, String imagePath, String author, int pages) {
 
         super(name, price, stock, description, category, color, imagePath);
 
-        //default values
         this.author = "Unknown author";
         this.pages = 1;
 
-        // author – only if not null and not blank
         if (author != null && !author.trim().isEmpty()) {
             this.author = author;
         }
 
-        // pages – must be positive
         if (pages > 0) {
             this.pages = pages;
         }
     }
 
-    //------------------------------------------------------------------------------------------
-
     /**
-     * Returns the author of this book.
+     * Returns the author name.
      *
-     * @return the author's name
+     * @return the author
      */
     public String getAuthor() {
-        return this.author;
+        return author;
     }
 
-
     /**
-     * Returns the number of pages in this book.
+     * Returns the number of pages.
      *
-     * @return the page count
+     * @return page count
      */
-    public int getPages() { return this.pages; }
-
-
-    //----------------------------------------------------------------------------------------
+    public int getPages() {
+        return pages;
+    }
 
     /**
-     * Returns a multi-line string describing this book product,
-     * including all product details and book-specific fields.
+     * Returns a string representation of this book product.
      *
-     * @return string representation of this book
+     * @return book product details
      */
     @Override
     public String toString() {
         return "Book Product\n" +
-            super.toString() + "\n" +
+                super.toString() + "\n" +
                 "Author: " + getAuthor() + "\n" +
                 "Pages: " + getPages();
     }
 
-
     /**
-     * Checks whether this book product is equal to another object.
+     * Compares this book product to another object.
      *
-     * Two BookProduct objects are considered equal if:
-     * 1. They are both instances of BookProduct.
-     * 2. The Product fields (name and category) are equal, as checked by super.equals(o).
-     * 3. They have the same author.
-     *
-     * @param o the object to compare with this book product
-     * @return true if both objects represent the same book product;
-     *         false otherwise
+     * @param o the object to compare
+     * @return true if equal, false otherwise
      */
     @Override
     public boolean equals(Object o) {
-        if (this == o) return true;                  // same object
-
-        if (!(o instanceof BookProduct)) return false; // not the same class
-
-        if (!super.equals(o)) return false;          // name + category checking (by father)
+        if (this == o) return true;
+        if (!(o instanceof BookProduct)) return false;
+        if (!super.equals(o)) return false;
 
         BookProduct other = (BookProduct) o;
-        return java.util.Objects.equals(this.author, other.author); //checking author
+        return Objects.equals(this.author, other.author);
     }
-
-
 }
