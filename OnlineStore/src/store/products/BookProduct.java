@@ -39,9 +39,9 @@ public class BookProduct extends Product {
      * @param pages       number of pages (must be positive, otherwise default)
      */
     public BookProduct(String name, double price, int stock, String description, Category category,
-                       Color color, String author, int pages){
+                       Color color, String imagePath , String author, int pages){
 
-        super(name, price, stock, description, category, color);
+        super(name, price, stock, description, category, color, imagePath);
 
         //default values
         this.author = "Unknown author";

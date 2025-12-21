@@ -127,8 +127,6 @@ public class CatalogManagementWindow extends JDialog {
             return;
         }
 
-        // עדכון הקטלוג בקובץ הדיפולטי
-        controller.saveCatalogToDefaultFile();
 
         // רענון הרשימה בחלון הניהול
         refreshProductList();

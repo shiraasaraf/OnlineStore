@@ -36,9 +36,9 @@ public class ElectronicsProduct extends Product{
      * @param brand           brand name (default if null or empty)
      */
     public ElectronicsProduct(String name, double price, int stock, String description,
-                              Category category, Color color, int warrantMonths, String brand){
+                              Category category, Color color, String imagePath, int warrantMonths, String brand){
 
-        super(name, price, stock, description, category, color);
+        super(name, price, stock, description, category, color, imagePath);
 
         //default values
         this.warrantMonths = 1;

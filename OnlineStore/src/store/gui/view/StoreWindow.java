@@ -5,12 +5,11 @@ import store.products.Product;
 
 import javax.swing.*;
 import java.awt.*;
-import java.awt.event.ActionListener;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
-import java.util.List;
 import java.io.File;
 import java.io.IOException;
+import java.util.List;
 
 public class StoreWindow extends JFrame {
 
@@ -22,8 +21,9 @@ public class StoreWindow extends JFrame {
 
     private final JButton loadButton;
     private final JButton saveButton;
-
     private final JButton manageCatalogButton;
+
+    private final JButton historyButton;
 
 
     public StoreWindow(StoreController storeController) {
@@ -35,7 +35,7 @@ public class StoreWindow extends JFrame {
         setDefaultCloseOperation(EXIT_ON_CLOSE);
         setLayout(new BorderLayout(10, 10));
 
-        //Top bar: title + IO buttons
+        // Top bar: title + buttons
         JPanel topBar = new JPanel(new BorderLayout());
         topBar.add(new JLabel("Product Catalog"), BorderLayout.WEST);
 
@@ -43,72 +43,102 @@ public class StoreWindow extends JFrame {
         loadButton = new JButton("Loading products from a file");
         saveButton = new JButton("Saving products to a file");
         manageCatalogButton = new JButton("Manage catalog");
+        historyButton = new JButton("Order History");
 
-        manageCatalogButton.setEnabled(controller.canManage());
 
-        // כיבוי במצב לקוח (רק Manager יכול לטעון/לשמור)
-        loadButton.setEnabled(controller.canManage());
-        saveButton.setEnabled(controller.canManage());
+        // Permissions: only Manager can manage / load / save
+        boolean isManager = controller.canManage();
+        manageCatalogButton.setEnabled(isManager);
+        loadButton.setEnabled(isManager);
+        saveButton.setEnabled(isManager);
+        historyButton.setEnabled(controller.canManage());
 
-        // IO buttons actions: open file chooser and delegate to controller
+
+        // ---- Load button ----
         loadButton.addActionListener(e -> {
             JFileChooser chooser = new JFileChooser();
             int result = chooser.showOpenDialog(this);
-            if (result == JFileChooser.APPROVE_OPTION) {
-                File selectedFile = chooser.getSelectedFile();
-                try {
-                    controller.loadProductsFromFile(selectedFile);
-                    // refresh catalog after loading
-                    setCatalogProducts(controller.getAvailableProducts());
-                    controller.saveCatalogToDefaultFile();
-                } catch (IOException ex) {
-                    JOptionPane.showMessageDialog(
-                            this,
-                            "Failed to load products from file.",
-                            "IO Error",
-                            JOptionPane.ERROR_MESSAGE
-                    );
-                }
+            if (result != JFileChooser.APPROVE_OPTION) return;
+
+            File selectedFile = chooser.getSelectedFile();
+            try {
+                controller.loadProductsFromFile(selectedFile);
+
+                // refresh catalog after loading
+                setCatalogProducts(controller.getAvailableProducts());
+
+                JOptionPane.showMessageDialog(
+                        this,
+                        "Products loaded successfully.",
+                        "Success",
+                        JOptionPane.INFORMATION_MESSAGE
+                );
+            } catch (IOException ex) {
+                JOptionPane.showMessageDialog(
+                        this,
+                        "Failed to load products from file:\n" + ex.getMessage(),
+                        "IO Error",
+                        JOptionPane.ERROR_MESSAGE
+                );
             }
         });
 
+        // ---- Save button ----
         saveButton.addActionListener(e -> {
             JFileChooser chooser = new JFileChooser();
             int result = chooser.showSaveDialog(this);
-            if (result == JFileChooser.APPROVE_OPTION) {
-                File selectedFile = chooser.getSelectedFile();
-                try {
-                    controller.saveProductsToFile(selectedFile);
-                } catch (IOException ex) {
-                    JOptionPane.showMessageDialog(
-                            this,
-                            "Failed to save products to file.",
-                            "IO Error",
-                            JOptionPane.ERROR_MESSAGE
-                    );
-                }
+            if (result != JFileChooser.APPROVE_OPTION) return;
+
+            File selectedFile = chooser.getSelectedFile();
+
+            try {
+                controller.saveProductsToFile(selectedFile);
+
+                JOptionPane.showMessageDialog(
+                        this,
+                        "Products saved successfully.",
+                        "Success",
+                        JOptionPane.INFORMATION_MESSAGE
+                );
+            } catch (IOException ex) {
+                JOptionPane.showMessageDialog(
+                        this,
+                        "Failed to save products to file:\n" + ex.getMessage(),
+                        "IO Error",
+                        JOptionPane.ERROR_MESSAGE
+                );
             }
         });
+
+        // ---- Manage catalog ----
+        manageCatalogButton.addActionListener(e -> {
+            CatalogManagementWindow dialog = new CatalogManagementWindow(this, controller);
+            dialog.setVisible(true);
+
+            // refresh after manager changes catalog
+            setCatalogProducts(controller.getAvailableProducts());
+        });
+
+        historyButton.addActionListener(e -> {
+            OrderHistoryWindow dialog = new OrderHistoryWindow(this, controller);
+            dialog.setVisible(true);
+        });
+
 
         ioButtons.add(loadButton);
         ioButtons.add(saveButton);
         ioButtons.add(manageCatalogButton);
-
-        manageCatalogButton.addActionListener(e -> {
-            CatalogManagementWindow dialog = new CatalogManagementWindow(this, controller);
-            dialog.setVisible(true);
-            setCatalogProducts(controller.getAvailableProducts());
-        });
+        ioButtons.add(historyButton);
 
 
         topBar.add(ioButtons, BorderLayout.EAST);
         add(topBar, BorderLayout.NORTH);
 
-        //Catalog Center
+        // Catalog Center
         catalogPanel = new JPanel(new GridLayout(0, 3, 10, 10));
         add(new JScrollPane(catalogPanel), BorderLayout.CENTER);
 
-        //Right side: details + cart (must be 1 component in east)
+        // Right side: details + cart
         JPanel rightPanel = new JPanel();
         rightPanel.setLayout(new BoxLayout(rightPanel, BoxLayout.Y_AXIS));
 
@@ -124,25 +154,27 @@ public class StoreWindow extends JFrame {
         // connect "Add to cart" button from details panel
         detailsPanel.addAddToCartListener(e -> {
             Product p = detailsPanel.getProduct();
-            int quantity = detailsPanel.getSelectedQuantity();
+            if (p == null) return;
 
+            int quantity = detailsPanel.getSelectedQuantity();
             boolean success = controller.addToCart(p, quantity);
 
             if (success) {
                 cartPanel.setItems(controller.getItems());
-                detailsPanel.showAddedFeedback(); //פידבק שנעלם אחרי שניה
-                detailsPanel.setProduct(p); // לרענון stock אם ירד
+                detailsPanel.showAddedFeedback(); // feedback disappears after 1 second
+                detailsPanel.setProduct(p);       // refresh stock view
+                setCatalogProducts(controller.getAvailableProducts()); // optional: refresh catalog grid
             } else {
                 JOptionPane.showMessageDialog(
                         this,
-                        "could not add product to cart",
+                        "Could not add product to cart",
                         "Error",
                         JOptionPane.ERROR_MESSAGE
                 );
             }
         });
 
-        //initial load for now
+        // initial catalog
         setCatalogProducts(controller.getAvailableProducts());
     }
 
@@ -164,14 +196,5 @@ public class StoreWindow extends JFrame {
 
         catalogPanel.revalidate();
         catalogPanel.repaint();
-    }
-
-    //Hooks for IO buttons (optional – if רוצים לחבר מאזורים אחרים)
-    public void addLoadProductsListener(ActionListener l) {
-        loadButton.addActionListener(l);
-    }
-
-    public void addSaveProductsListener(ActionListener l) {
-        saveButton.addActionListener(l);
     }
 }

@@ -33,16 +33,16 @@ public class ClothingProduct extends Product {
      * @param size        clothing size (default if null or empty)
      */
     public ClothingProduct(String name, double price, int stock, String description,
-                           Category category, Color color, String size) {
+                           Category category, Color color, String imagePath, String size) {
 
-        super(name, price, stock, description, category, color);
+        super(name, price, stock, description, category, color, imagePath );
 
         //default value
         this.size = "Unknown size";
 
         // size – only if non-null and not blank
         if (size != null && !size.trim().isEmpty()) {
-            this.size = size;
+            this.size = size.trim();
         }
 
     }

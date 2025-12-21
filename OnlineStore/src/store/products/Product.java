@@ -51,7 +51,7 @@ public abstract class Product implements StoreEntity, PricedItem, StockManageabl
         this.description = "";
         this.category = Category.BOOKS; //Randomly selected because it must be from Category enum
         this.color = Color.BLACK; //Randomly selected because it must be from Color class
-        this.imagePath = "images/default.jpg";
+        this.imagePath = "images/default.jpg"; //default image
 
         // name – only if non-null and not blank
         if (name != null && !name.trim().isEmpty()) {
@@ -68,10 +68,15 @@ public abstract class Product implements StoreEntity, PricedItem, StockManageabl
             this.color = color;
         }
 
+        // imagePath
+        if (imagePath != null && !imagePath.trim().isEmpty()) {
+        this.imagePath = imagePath.trim();
+        }
+
         // use setters so validation is centralized
-    setPrice(price);                // if invalid, keeps default price
-    setStock(stock);                // if invalid, keeps default stock
-    setDescription(description);    // if invalid, keeps default description
+        setPrice(price);                // if invalid, keeps default price
+        setStock(stock);                // if invalid, keeps default stock
+        setDescription(description);    // if invalid, keeps default description
     }
 
     //----------------------------------------------------------------------------------------------------
@@ -179,7 +184,8 @@ public abstract class Product implements StoreEntity, PricedItem, StockManageabl
                 "Price: " + getPrice() + "\n" +
                 "Category: " + getCategory() + "\n" +
                 "Description: " + getDescription() + "\n" +
-                "Color: " + getColor();
+                "Color: " + getColor() + "\n" +
+                "Image: " + getImagePath() + "\n";
     }
 
     //-------------------------------------------------------------------------------------------

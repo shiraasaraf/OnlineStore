@@ -37,23 +37,37 @@ public class ProductPanel extends JPanel {
     }
 
     private void loadImage() {
-        String path = product.getImagePath(); // צריך להיות קיים ב-Product
-        if (path == null || path.isBlank()) {
-            imageLabel.setText("No Image");
-            return;
-        }
+        try {
+            String path = product.getImagePath();
 
-        // אם path הוא כמו: "images/phone.png" תחת resources
-        URL url = getClass().getClassLoader().getResource(path);
-        if (url == null) {
-            imageLabel.setText("Image not found");
-            return;
-        }
+            if (path == null || path.isBlank()) {
+                imageLabel.setIcon(null);
+                imageLabel.setText("No Image");
+                return;
+            }
 
-        ImageIcon icon = new ImageIcon(url);
-        Image scaled = icon.getImage().getScaledInstance(140, 100, Image.SCALE_SMOOTH);
-        imageLabel.setIcon(new ImageIcon(scaled));
+            // path like: "images/electronics/laptop.jpg"
+            URL url = getClass().getClassLoader().getResource(path);
+
+            if (url == null) {
+                imageLabel.setIcon(null);
+                imageLabel.setText("Image not found");
+                return;
+            }
+
+            ImageIcon icon = new ImageIcon(url);
+            Image scaled = icon.getImage().getScaledInstance(140, 100, Image.SCALE_SMOOTH);
+
+            imageLabel.setText("");
+            imageLabel.setIcon(new ImageIcon(scaled));
+
+        } catch (Exception ex) {
+            imageLabel.setIcon(null);
+            imageLabel.setText("Image error");
+        }
     }
+
+
 
 
     public Product getProduct() {
