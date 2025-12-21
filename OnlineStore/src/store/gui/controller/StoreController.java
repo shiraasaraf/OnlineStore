@@ -86,5 +86,8 @@ public class StoreController {
         return manager != null;
     }
 
+    public boolean removeFromCart(Product p) {
+        return customer.removeFromCart(p);
+    }
 }
 

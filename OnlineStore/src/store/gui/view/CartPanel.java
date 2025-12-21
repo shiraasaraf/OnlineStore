@@ -93,12 +93,14 @@ public class CartPanel extends JPanel {
         JLabel lineTotal = new JLabel("$" + item.getTotalPrice());
 
         JButton removeButton = new JButton("Remove");
-        // מזהה לפריט: נשתמש בשם מוצר (או משהו ייחודי יותר אם יש לך ID)
-        removeButton.setActionCommand(name);
+        removeButton.putClientProperty("product", p);
 
-        if (removeListener != null) {
-            removeButton.addActionListener(removeListener);
-        }
+        removeButton.addActionListener(e -> {
+            if (removeListener != null) {
+                removeListener.actionPerformed(e);
+            }
+        });
+
 
         right.add(lineTotal);
         right.add(removeButton);

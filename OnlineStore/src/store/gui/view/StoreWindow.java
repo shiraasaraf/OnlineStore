@@ -145,6 +145,29 @@ public class StoreWindow extends JFrame {
         detailsPanel = new ProductDetailsPanel(null);
         cartPanel = new CartPanel();
 
+        cartPanel.addRemoveItemListener(ev -> {
+            JButton btn = (JButton) ev.getSource();
+            Product p = (Product) btn.getClientProperty("product");
+            if (p == null) return;
+
+            boolean removed = controller.removeFromCart(p); // נוסיף מתודה כזו
+            if (!removed) {
+                JOptionPane.showMessageDialog(
+                        this,
+                        "Failed to remove item from cart",
+                        "Error",
+                        JOptionPane.ERROR_MESSAGE
+                );
+                return;
+            }
+
+            cartPanel.setItems(controller.getItems());
+            setCatalogProducts(controller.getAvailableProducts());
+            detailsPanel.setProduct(detailsPanel.getProduct());
+        });
+
+
+
         rightPanel.add(detailsPanel);
         rightPanel.add(Box.createVerticalStrut(10));
         rightPanel.add(cartPanel);
@@ -177,6 +200,9 @@ public class StoreWindow extends JFrame {
         // initial catalog
         setCatalogProducts(controller.getAvailableProducts());
     }
+
+
+
 
     public void setCatalogProducts(List<Product> products) {
         catalogPanel.removeAll();
