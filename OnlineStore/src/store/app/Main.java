@@ -6,8 +6,12 @@ import store.engine.StoreEngine;
 import store.gui.controller.StoreController;
 import store.gui.view.LoginWindow;
 import store.gui.view.StoreWindow;
+import store.products.*;
+
 
 import javax.swing.*;
+import java.awt.*;
+
 
 public class Main {
 
@@ -16,6 +20,8 @@ public class Main {
         SwingUtilities.invokeLater(() -> {
 
             StoreEngine engine = StoreEngine.getInstance();
+
+            engine.loadDefaultCatalogIfExists();
 
             LoginWindow login = new LoginWindow();
 
@@ -46,4 +52,35 @@ public class Main {
             login.setVisible(true);
         });
     }
+
+
+    private static void seedProducts(StoreEngine engine) {
+
+        engine.addProduct(new ElectronicsProduct(
+                "Laptop",
+                3500.0,
+                5,
+                "14 inch laptop",
+                Category.ELECTRONICS,
+                Color.BLACK,
+                24,
+                "Dell"
+        ));
+
+        engine.addProduct(new ElectronicsProduct(
+                "Phone",
+                2500.0,
+                8,
+                "Android Phone",
+                Category.ELECTRONICS,
+                Color.GRAY,
+                12,
+                "Samsung"
+        ));
+    }
+
+
 }
+
+
+
