@@ -6,6 +6,8 @@
 
 package store.order;
 
+import java.time.LocalDateTime;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -25,6 +27,9 @@ import store.core.Persistable;
  * to allow saving order data to persistent storage in the future.
  */
 public class Order implements Persistable {
+
+    /** Creation date/time of this order */
+    private LocalDateTime createdAt;
 
     /** Unique identifier of the order */
     private int orderID;
@@ -48,10 +53,20 @@ public class Order implements Persistable {
      * @param totalAmount the total calculated price of the order
      */
     public Order(int orderID, List<CartItem> items, double totalAmount) {
+        this(orderID, items, totalAmount, LocalDateTime.now());
+    }
+
+    public Order(int orderID, List<CartItem> items, double totalAmount, LocalDateTime createdAt) {
         this.orderID = orderID;
         this.items = new ArrayList<>(items);
         this.totalAmount = totalAmount;
         this.status = OrderStatus.NEW;
+        this.createdAt = createdAt;
+    }
+
+
+    public LocalDateTime getCreatedAt() {
+        return createdAt;
     }
 
     /**

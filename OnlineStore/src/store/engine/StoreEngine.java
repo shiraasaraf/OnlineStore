@@ -13,6 +13,11 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
+import java.io.BufferedReader;
+import java.io.FileReader;
+import java.io.File;
+
+
 public class StoreEngine {
 
     /** Singleton instance */
@@ -146,7 +151,7 @@ public class StoreEngine {
                     "%d,%.2f,%s,%s",
                     order.getOrderID(),
                     order.getTotalAmount(),
-                    LocalDateTime.now(),
+                    order.getCreatedAt(),
                     itemsSummary
             );
 
@@ -157,6 +162,96 @@ public class StoreEngine {
             e.printStackTrace();
         }
     }
+
+
+    /**
+     * BONUS: load existing orders history from file (if exists)
+     */
+    public void loadOrderHistoryFromFile() {
+        File file = new File(ORDER_HISTORY_FILE);
+        if (!file.exists() || !file.isFile()) {
+            return; // no history yet – this is fine
+        }
+
+        try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
+            String line;
+
+            while ((line = reader.readLine()) != null) {
+                // expected: orderId,totalAmount,date,items...
+                String[] parts = line.split(",", 4);
+                if (parts.length < 4) {
+                    continue;
+                }
+
+                int orderId;
+                double total;
+                try {
+                    orderId = Integer.parseInt(parts[0].trim());
+                    total = Double.parseDouble(parts[1].trim());
+                } catch (NumberFormatException ex) {
+                    continue;
+                }
+
+                String dateStr = parts[2].trim();
+                String itemsStr = parts[3].trim();
+
+                LocalDateTime createdAt;
+                try {
+                    createdAt = LocalDateTime.parse(dateStr);
+                } catch (Exception ex) {
+                    createdAt = LocalDateTime.now(); // fallback
+                }
+
+                // parse items: "Name x2; Other x1; ..."
+                List<CartItem> items = parseItemsSummary(itemsStr);
+
+                Order order = new Order(orderId, items, total, createdAt);
+                allOrders.add(order);
+
+                if (orderId > nextOrderId) {
+                    nextOrderId = orderId;
+                }
+            }
+
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    /**
+     * Helper: parse items summary of format "ProductName x3; Another x1; ..."
+     */
+    private List<CartItem> parseItemsSummary(String summary) {
+        List<CartItem> result = new ArrayList<>();
+        if (summary == null || summary.isEmpty()) return result;
+
+        String[] tokens = summary.split(";");
+        for (String token : tokens) {
+            String t = token.trim();
+            if (t.isEmpty()) continue;
+
+            String[] parts = t.split(" x");
+            if (parts.length != 2) continue;
+
+            String productName = parts[0].trim();
+            String qtyStr = parts[1].trim();
+
+            int qty;
+            try {
+                qty = Integer.parseInt(qtyStr);
+            } catch (NumberFormatException ex) {
+                continue;
+            }
+
+            Product p = findProductByName(productName);
+            if (p != null) {
+                result.add(new CartItem(p, qty));
+            }
+        }
+
+        return result;
+    }
+
 
     // ------------------------------------------------------------------------
     // Helpers
