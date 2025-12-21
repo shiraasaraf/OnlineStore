@@ -1,22 +1,42 @@
+/**
+ * Submitted by:
+ * Tamar Nahum, ID 021983812
+ * Shira Asaraf, ID 322218439
+ */
+
 package store.io;
 
 import store.products.*;
-import store.products.Category;
 
 import java.awt.Color;
 import java.io.*;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Utility class for loading and saving product catalogs.
+ * <p>
+ * Supports CSV/text file format.
+ * </p>
+ */
 public final class ProductCatalogIO {
 
+    /** Prevent instantiation. */
     private ProductCatalogIO() {}
 
-    private static final String HEADER = "name,price,stock,description,category,imagePath";
+    /** CSV header line. */
+    private static final String HEADER =
+            "name,price,stock,description,category,imagePath";
+
+    /** Default image path for products. */
     private static final String DEFAULT_IMAGE = "images/default.jpg";
 
     /**
-     * Loads products from a CSV/text file and returns them as a list.
+     * Loads products from a CSV/text file.
+     *
+     * @param file input file
+     * @return list of loaded products
+     * @throws IOException if file reading fails
      */
     public static List<Product> loadProductsFromFile(File file) throws IOException {
         List<Product> result = new ArrayList<>();
@@ -29,8 +49,9 @@ public final class ProductCatalogIO {
                 line = line.trim();
                 if (line.isEmpty()) continue;
 
-                // skip header if present
-                if (line.equalsIgnoreCase(HEADER) || line.toLowerCase().startsWith("name,")) {
+                // Skip header if present
+                if (line.equalsIgnoreCase(HEADER) ||
+                        line.toLowerCase().startsWith("name,")) {
                     continue;
                 }
 
@@ -45,9 +66,14 @@ public final class ProductCatalogIO {
     }
 
     /**
-     * Saves the given list of products to a CSV/text file.
+     * Saves a list of products to a CSV/text file.
+     *
+     * @param file     output file
+     * @param products products to save
+     * @throws IOException if file writing fails
      */
-    public static void saveProductsToFile(File file, List<Product> products) throws IOException {
+    public static void saveProductsToFile(File file,
+                                          List<Product> products) throws IOException {
         if (file == null) return;
 
         try (BufferedWriter writer = new BufferedWriter(new FileWriter(file))) {
@@ -68,6 +94,12 @@ public final class ProductCatalogIO {
     // Private helpers
     // ------------------------------------------------------------------------
 
+    /**
+     * Parses a single CSV line into a Product object.
+     *
+     * @param line CSV line
+     * @return created product or null if parsing fails
+     */
     private static Product parseProductLine(String line) {
         String[] parts = line.split(",", -1);
         if (parts.length < 5) return null;
@@ -92,11 +124,10 @@ public final class ProductCatalogIO {
             category = Category.ELECTRONICS;
         }
 
-        String imagePath = null;
+        String imagePath = DEFAULT_IMAGE;
         if (parts.length >= 6 && !parts[5].trim().isEmpty()) {
             imagePath = parts[5].trim();
         }
-        if (imagePath == null) imagePath = DEFAULT_IMAGE;
 
         switch (category) {
             case BOOKS:
@@ -123,6 +154,12 @@ public final class ProductCatalogIO {
         }
     }
 
+    /**
+     * Converts a product to a CSV line.
+     *
+     * @param p product to convert
+     * @return CSV representation
+     */
     private static String productToCsvLine(Product p) {
         String name = safe(p.getName());
         String description = safe(p.getDescription()).replace(",", " ");
@@ -142,6 +179,12 @@ public final class ProductCatalogIO {
         );
     }
 
+    /**
+     * Returns a safe string (never null).
+     *
+     * @param s input string
+     * @return trimmed string or empty string
+     */
     private static String safe(String s) {
         return (s == null) ? "" : s.trim();
     }

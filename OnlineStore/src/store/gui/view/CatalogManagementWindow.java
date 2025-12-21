@@ -1,3 +1,9 @@
+/**
+ * Submitted by:
+ * Tamar Nahum, ID 021983812
+ * Shira Asaraf, ID 322218439
+ */
+
 package store.gui.view;
 
 import store.gui.controller.StoreController;
@@ -9,21 +15,39 @@ import java.awt.event.ActionEvent;
 import java.util.List;
 
 /**
- * A simple management window for the store catalog.
- * Allows a manager to see all products and remove selected ones.
+ * Dialog window for catalog management.
+ * <p>
+ * Displays all products and allows removing a selected product.
+ * </p>
  */
 public class CatalogManagementWindow extends JDialog {
 
+    /** Controller used to access catalog operations. */
     private final StoreController controller;
+
+    /** Parent store window to refresh catalog after changes. */
     private final StoreWindow parentWindow;
 
+    /** List model backing the products list. */
     private final DefaultListModel<Product> listModel;
+
+    /** Products list UI component. */
     private final JList<Product> productList;
+
+    /** Removes the selected product. */
     private final JButton removeButton;
+
+    /** Closes the dialog. */
     private final JButton closeButton;
 
+    /**
+     * Creates a modal catalog management dialog.
+     *
+     * @param parentWindow parent window
+     * @param controller   store controller
+     */
     public CatalogManagementWindow(StoreWindow parentWindow, StoreController controller) {
-        super(parentWindow, "Catalog Management", true); // modal dialog
+        super(parentWindow, "Catalog Management", true);
 
         this.controller = controller;
         this.parentWindow = parentWindow;
@@ -31,11 +55,9 @@ public class CatalogManagementWindow extends JDialog {
         setSize(500, 400);
         setLocationRelativeTo(parentWindow);
 
-        // List model and JList
         listModel = new DefaultListModel<>();
         productList = new JList<>(listModel);
 
-        // נשתמש ב-toString של Product או נשפר מעט את התצוגה
         productList.setCellRenderer(new DefaultListCellRenderer() {
             @Override
             public Component getListCellRendererComponent(JList<?> list,
@@ -43,13 +65,13 @@ public class CatalogManagementWindow extends JDialog {
                                                           int index,
                                                           boolean isSelected,
                                                           boolean cellHasFocus) {
-                JLabel label = (JLabel) super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus);
+                JLabel label = (JLabel) super.getListCellRendererComponent(
+                        list, value, index, isSelected, cellHasFocus
+                );
 
                 if (value instanceof Product) {
                     Product p = (Product) value;
-                    String text = p.getName() + " | " +
-                            p.getCategory() + " | stock: " + p.getStock();
-                    label.setText(text);
+                    label.setText(p.getName() + " | " + p.getCategory() + " | stock: " + p.getStock());
                 }
 
                 return label;
@@ -61,7 +83,6 @@ public class CatalogManagementWindow extends JDialog {
         removeButton = new JButton("Delete selected product");
         closeButton = new JButton("Close");
 
-        // Bottom buttons panel
         JPanel bottomPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
         bottomPanel.add(removeButton);
         bottomPanel.add(closeButton);
@@ -70,16 +91,14 @@ public class CatalogManagementWindow extends JDialog {
         add(scrollPane, BorderLayout.CENTER);
         add(bottomPanel, BorderLayout.SOUTH);
 
-        // Load products into the list
         refreshProductList();
 
-        // Listeners
         removeButton.addActionListener(this::onRemoveClicked);
         closeButton.addActionListener(e -> dispose());
     }
 
     /**
-     * Loads products from the controller into the list model.
+     * Reloads products from the controller into the list model.
      */
     private void refreshProductList() {
         listModel.clear();
@@ -90,7 +109,9 @@ public class CatalogManagementWindow extends JDialog {
     }
 
     /**
-     * Called when the "Delete selected product" button is clicked.
+     * Handles remove button click.
+     *
+     * @param e action event
      */
     private void onRemoveClicked(ActionEvent e) {
         Product selected = productList.getSelectedValue();
@@ -127,11 +148,7 @@ public class CatalogManagementWindow extends JDialog {
             return;
         }
 
-
-        // רענון הרשימה בחלון הניהול
         refreshProductList();
-
-        // רענון הקטלוג בחלון הראשי
         parentWindow.setCatalogProducts(controller.getAvailableProducts());
     }
 }

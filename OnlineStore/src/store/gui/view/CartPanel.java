@@ -1,3 +1,9 @@
+/**
+ * Submitted by:
+ * Tamar Nahum, ID 021983812
+ * Shira Asaraf, ID 322218439
+ */
+
 package store.gui.view;
 
 import store.cart.CartItem;
@@ -8,17 +14,30 @@ import java.awt.*;
 import java.awt.event.ActionListener;
 import java.util.List;
 
+/**
+ * Swing panel that displays the shopping cart contents.
+ * <p>
+ * Shows a list of cart items, total price, and a checkout button.
+ * The controller attaches listeners for removing items and for checkout.
+ * </p>
+ */
 public class CartPanel extends JPanel {
 
-    // אזור שמכיל שורות של פריטים
+    /** Panel that holds item rows. */
     private final JPanel itemsPanel;
 
+    /** Displays the current cart total. */
     private final JLabel totalLabel;
+
+    /** Checkout button. */
     private final JButton checkoutButton;
 
-    // ActionListener להסרה (ה-Controller יתקין)
+    /** Listener used for "Remove" buttons (installed by the controller). */
     private ActionListener removeListener;
 
+    /**
+     * Constructs an empty cart panel UI.
+     */
     public CartPanel() {
         setLayout(new BorderLayout());
         setBorder(BorderFactory.createTitledBorder("Shopping Cart"));
@@ -40,7 +59,9 @@ public class CartPanel extends JPanel {
     }
 
     /**
-     * ה-Controller יקרא לזה אחרי כל שינוי בעגלה
+     * Updates the displayed cart items and total.
+     *
+     * @param items cart items to display
      */
     public void setItems(List<CartItem> items) {
         itemsPanel.removeAll();
@@ -59,15 +80,21 @@ public class CartPanel extends JPanel {
     }
 
     /**
-     * Hook: ה-Controller מתקין listener אחד, וכל כפתור "Remove" יפעיל אותו.
-     * ה-Controller יבדוק event.getActionCommand() כדי לדעת איזה מוצר להסיר.
+     * Installs a listener for item removal actions.
+     * <p>
+     * The listener is triggered when any "Remove" button is pressed.
+     * </p>
+     *
+     * @param l listener to install
      */
     public void addRemoveItemListener(ActionListener l) {
         this.removeListener = l;
     }
 
     /**
-     * Hook: ה-Controller מתקין listener לכפתור checkout.
+     * Installs a listener for the checkout button.
+     *
+     * @param l listener to install
      */
     public void addCheckoutListener(ActionListener l) {
         checkoutButton.addActionListener(l);
@@ -75,20 +102,24 @@ public class CartPanel extends JPanel {
 
     // ---- private helpers ----
 
+    /**
+     * Creates a UI row for a single cart item.
+     *
+     * @param item cart item
+     * @return row panel
+     */
     private JPanel createRow(CartItem item) {
         Product p = item.getProduct();
 
         JPanel row = new JPanel(new BorderLayout(8, 0));
         row.setBorder(BorderFactory.createEmptyBorder(4, 4, 4, 4));
 
-        // שמאל: שם + מחיר יחידה
         String name = (p == null) ? "Unknown" : p.getDisplayName();
         double unitPrice = (p == null) ? 0.0 : p.getPrice();
 
         JLabel info = new JLabel(name + " | Unit: $" + unitPrice + " | Qty: " + item.getQuantity());
         row.add(info, BorderLayout.CENTER);
 
-        // ימין: מחיר כולל + כפתור הסרה
         JPanel right = new JPanel(new FlowLayout(FlowLayout.RIGHT, 6, 0));
         JLabel lineTotal = new JLabel("$" + item.getTotalPrice());
 
@@ -100,7 +131,6 @@ public class CartPanel extends JPanel {
                 removeListener.actionPerformed(e);
             }
         });
-
 
         right.add(lineTotal);
         right.add(removeButton);

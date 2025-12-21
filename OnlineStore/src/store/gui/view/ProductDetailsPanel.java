@@ -1,3 +1,9 @@
+/**
+ * Submitted by:
+ * Tamar Nahum, ID 021983812
+ * Shira Asaraf, ID 322218439
+ */
+
 package store.gui.view;
 
 import store.products.Product;
@@ -11,35 +17,53 @@ import java.io.IOException;
 import java.net.URL;
 
 /**
- * A Swing panel that displays details of the currently selected product.
+ * Panel that displays details of the selected product.
  * <p>
- * Displays the product name, description, price, stock amount, product image,
+ * Shows product fields (name, price, stock, description), product image,
  * and an "Add to Cart" button.
  * </p>
  */
 public class ProductDetailsPanel extends JPanel {
 
+    /** Currently displayed product (may be null). */
     private Product product;
 
-    // UI components
+    /** Image label. */
     private final JLabel imageLabel = new JLabel();
+
+    /** Name label. */
     private final JLabel nameLabel = new JLabel();
+
+    /** Price label. */
     private final JLabel priceLabel = new JLabel();
+
+    /** Stock label. */
     private final JLabel stockLabel = new JLabel();
 
+    /** Description label (HTML). */
     private JLabel descriptionLabel;
+
+    /** Add-to-cart button. */
     private final JButton addToCartButton = new JButton("Add to Cart");
+
+    /** Feedback message label. */
     private final JLabel feedbackLabel = new JLabel(" ");
 
-    // Image display size (match your product tile proportions)
+    /** Fixed image display size. */
     private static final int IMG_W = 169;
+
+    /** Fixed image display size. */
     private static final int IMG_H = 219;
 
+    /**
+     * Constructs a product details panel.
+     *
+     * @param product initial product to display (may be null)
+     */
     public ProductDetailsPanel(Product product) {
         setLayout(new BoxLayout(this, BoxLayout.Y_AXIS));
         setBorder(BorderFactory.createTitledBorder("Product Details"));
 
-        // image
         imageLabel.setHorizontalAlignment(SwingConstants.CENTER);
         imageLabel.setPreferredSize(new Dimension(IMG_W, IMG_H));
         imageLabel.setMinimumSize(new Dimension(IMG_W, IMG_H));
@@ -50,41 +74,33 @@ public class ProductDetailsPanel extends JPanel {
         add(imageLabel);
         add(Box.createVerticalStrut(8));
 
-        // labels
         add(nameLabel);
         add(priceLabel);
         add(stockLabel);
 
         add(Box.createVerticalStrut(8));
 
-        // description
         descriptionLabel = new JLabel();
         descriptionLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
-
-        // מאפשר עטיפת שורות ל־JLabel
         descriptionLabel.setText("<html>Description: </html>");
-
         add(descriptionLabel);
 
         add(Box.createVerticalStrut(8));
 
-        // add-to-cart button (quantity moved to cart)
         JPanel bottomRow = new JPanel(new FlowLayout(FlowLayout.LEFT));
         bottomRow.add(addToCartButton);
         add(bottomRow);
 
-        // feedback message
         feedbackLabel.setForeground(new Color(0, 128, 0));
         add(feedbackLabel);
 
-        // init
         setProduct(product);
     }
 
     /**
-     * Replaces the currently displayed product and refreshes the UI.
+     * Sets the product to display and refreshes the UI.
      *
-     * @param product the product to display (may be {@code null})
+     * @param product the product (may be null)
      */
     public void setProduct(Product product) {
         this.product = product;
@@ -94,23 +110,23 @@ public class ProductDetailsPanel extends JPanel {
     /**
      * Returns the currently displayed product.
      *
-     * @return the current product (may be {@code null})
+     * @return the current product (may be null)
      */
     public Product getProduct() {
         return product;
     }
 
     /**
-     * Registers a listener for the "Add to Cart" button.
+     * Adds a listener to the "Add to Cart" button.
      *
-     * @param listener the action listener to register
+     * @param listener action listener
      */
     public void addAddToCartListener(ActionListener listener) {
         addToCartButton.addActionListener(listener);
     }
 
     /**
-     * Shows a short feedback message after a successful add-to-cart action.
+     * Shows a temporary "added to cart" feedback message.
      */
     public void showAddedFeedback() {
         feedbackLabel.setText("Added to cart!");
@@ -119,16 +135,15 @@ public class ProductDetailsPanel extends JPanel {
         t.start();
     }
 
-    // --- internal UI update ---
-
+    /**
+     * Refreshes all fields based on the current product.
+     */
     private void refreshView() {
         if (product == null) {
             nameLabel.setText("Name: -");
             priceLabel.setText("Price: -");
             stockLabel.setText("Stock: -");
             descriptionLabel.setText("Description: -");
-
-
 
             imageLabel.setIcon(null);
             imageLabel.setText("No Image");
@@ -140,26 +155,23 @@ public class ProductDetailsPanel extends JPanel {
             return;
         }
 
-        // text fields
         nameLabel.setText("Name: " + product.getDisplayName());
         priceLabel.setText("Price: " + product.getPrice() + "$");
         stockLabel.setText("Stock: " + product.getStock());
 
-        String desc = product.getDescription() == null ? "" : product.getDescription();
+        String desc = (product.getDescription() == null) ? "" : product.getDescription();
         descriptionLabel.setText("<html><b>Description:</b> " + desc + "</html>");
 
-        // image
         loadProductImage();
 
-        // enable/disable add button
         addToCartButton.setEnabled(product.getStock() > 0);
-
         feedbackLabel.setText(" ");
     }
 
+    /**
+     * Loads and scales the product image into the image label.
+     */
     private void loadProductImage() {
-        // התאימי לפי איך שאת שומרת נתיב תמונה במוצר
-        // אם אצלך זה getImagePath() – זה המצב הנפוץ אצלך בפרויקט
         String path;
         try {
             path = product.getImagePath();

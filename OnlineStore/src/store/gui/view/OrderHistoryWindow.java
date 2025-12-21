@@ -1,8 +1,14 @@
+/**
+ * Submitted by:
+ * Tamar Nahum, ID 021983812
+ * Shira Asaraf, ID 322218439
+ */
+
 package store.gui.view;
 
+import store.cart.CartItem;
 import store.gui.controller.StoreController;
 import store.order.Order;
-import store.cart.CartItem;
 
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
@@ -10,23 +16,36 @@ import java.awt.*;
 import java.util.List;
 
 /**
- * OrderHistoryWindow
- * ------------------
- * A simple window that displays the store's order history in a table.
- * Data comes from the Model through the StoreController (MVC friendly).
+ * Dialog window that displays the order history in a table.
+ * <p>
+ * Orders are retrieved through {@link StoreController}.
+ * </p>
  */
 public class OrderHistoryWindow extends JDialog {
 
+    /** Controller used to fetch orders. */
     private final StoreController controller;
 
+    /** Table model for orders. */
     private final DefaultTableModel tableModel;
+
+    /** Orders table. */
     private final JTable table;
 
+    /** Reloads the table data. */
     private final JButton refreshButton;
+
+    /** Closes the dialog. */
     private final JButton closeButton;
 
+    /**
+     * Creates a modal order history dialog.
+     *
+     * @param parent     parent frame
+     * @param controller store controller
+     */
     public OrderHistoryWindow(JFrame parent, StoreController controller) {
-        super(parent, "Order History", true); // modal dialog
+        super(parent, "Order History", true);
 
         this.controller = controller;
 
@@ -34,14 +53,13 @@ public class OrderHistoryWindow extends JDialog {
         setLocationRelativeTo(parent);
         setLayout(new BorderLayout(10, 10));
 
-        // ----- Table -----
         tableModel = new DefaultTableModel(
                 new Object[]{"Order ID", "Total Amount", "Created At", "Items"},
                 0
         ) {
             @Override
             public boolean isCellEditable(int row, int column) {
-                return false; // read-only
+                return false;
             }
         };
 
@@ -50,7 +68,6 @@ public class OrderHistoryWindow extends JDialog {
 
         add(new JScrollPane(table), BorderLayout.CENTER);
 
-        // ----- Bottom buttons -----
         JPanel bottom = new JPanel(new FlowLayout(FlowLayout.RIGHT));
         refreshButton = new JButton("Refresh");
         closeButton = new JButton("Close");
@@ -60,44 +77,38 @@ public class OrderHistoryWindow extends JDialog {
 
         add(bottom, BorderLayout.SOUTH);
 
-        // Listeners
         refreshButton.addActionListener(e -> refreshOrders());
         closeButton.addActionListener(e -> dispose());
 
-        // Initial load
         refreshOrders();
     }
 
     /**
-     * Refresh the table contents from controller.getAllOrders().
+     * Reloads the table contents from the controller.
      */
     private void refreshOrders() {
         tableModel.setRowCount(0);
 
         List<Order> orders = controller.getAllOrders();
-
         if (orders == null || orders.isEmpty()) {
-            // optional: show an empty row or just leave table empty
-            // Here we leave it empty and show a message once.
-            // (If you prefer not to show a popup, tell me and I'll change it.)
             return;
         }
 
         for (Order o : orders) {
-            String itemsText = buildItemsSummary(o);
-
             tableModel.addRow(new Object[]{
                     o.getOrderID(),
                     String.format("%.2f", o.getTotalAmount()),
-                    o.getCreatedAt(),        // ככה הסדר נכון!
+                    o.getCreatedAt(),
                     buildItemsSummary(o)
             });
-
         }
     }
 
     /**
-     * Builds a readable items summary for the order: "Laptop x2; Phone x1"
+     * Builds a readable items summary for an order.
+     *
+     * @param order the order
+     * @return items summary string
      */
     private String buildItemsSummary(Order order) {
         if (order == null || order.getItems() == null) {
@@ -114,7 +125,6 @@ public class OrderHistoryWindow extends JDialog {
                     .append("; ");
         }
 
-        // remove last "; "
         if (sb.length() >= 2) {
             sb.setLength(sb.length() - 2);
         }

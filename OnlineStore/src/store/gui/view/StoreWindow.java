@@ -1,9 +1,14 @@
+/**
+ * Submitted by:
+ * Tamar Nahum, ID 021983812
+ * Shira Asaraf, ID 322218439
+ */
+
 package store.gui.view;
 
 import store.gui.controller.StoreController;
-import store.products.Product;
 import store.products.Category;
-
+import store.products.Product;
 
 import javax.swing.*;
 import java.awt.*;
@@ -13,27 +18,53 @@ import java.io.File;
 import java.io.IOException;
 import java.util.List;
 
+/**
+ * Main store window.
+ * <p>
+ * Displays the product catalog grid, product details panel, and shopping cart panel.
+ * Includes search and category filtering, and provides manager actions (load/save/manage catalog).
+ * </p>
+ */
 public class StoreWindow extends JFrame {
 
+    /** Catalog grid panel. */
     private final JPanel catalogPanel;
+
+    /** Controller used to access model operations. */
     private final StoreController controller;
 
+    /** Panel that displays selected product details. */
     private final ProductDetailsPanel detailsPanel;
+
+    /** Shopping cart panel. */
     private final CartPanel cartPanel;
 
+    /** Button for loading products (manager only). */
     private final JButton loadButton;
+
+    /** Button for saving products (manager only). */
     private final JButton saveButton;
+
+    /** Button for opening catalog management (manager only). */
     private final JButton manageCatalogButton;
 
+    /** Button for opening order history. */
     private final JButton historyButton;
-    // Search + filter
+
+    /** Search field. */
     private final JTextField searchField = new JTextField(18);
+
+    /** Clears search and filters. */
     private final JButton clearSearchButton = new JButton("Clear");
 
+    /** Category filter combo box ("All" + categories). */
     private final JComboBox<Object> categoryCombo = new JComboBox<>();
 
-
-
+    /**
+     * Constructs the main store window.
+     *
+     * @param storeController store controller
+     */
     public StoreWindow(StoreController storeController) {
 
         this.controller = storeController;
@@ -42,7 +73,6 @@ public class StoreWindow extends JFrame {
         setSize(1000, 650);
         setDefaultCloseOperation(EXIT_ON_CLOSE);
         setExtendedState(JFrame.MAXIMIZED_BOTH);
-
         setLayout(new BorderLayout(10, 10));
 
         // Top bar: title + buttons
@@ -55,18 +85,14 @@ public class StoreWindow extends JFrame {
         manageCatalogButton = new JButton("Manage catalog");
         historyButton = new JButton("Order History");
 
-
-        // Permissions: only Manager can manage / load / save
         boolean isManager = controller.canManage();
         manageCatalogButton.setEnabled(isManager);
         loadButton.setEnabled(isManager);
         saveButton.setEnabled(isManager);
 
-        //history also for customer
         historyButton.setEnabled(true);
 
-
-        // ---- Load button ----
+        // Load products
         loadButton.addActionListener(e -> {
             JFileChooser chooser = new JFileChooser();
             int result = chooser.showOpenDialog(this);
@@ -75,8 +101,6 @@ public class StoreWindow extends JFrame {
             File selectedFile = chooser.getSelectedFile();
             try {
                 controller.loadProductsFromFile(selectedFile);
-
-                // refresh catalog after loading
                 setCatalogProducts(controller.getAvailableProducts());
 
                 JOptionPane.showMessageDialog(
@@ -95,7 +119,7 @@ public class StoreWindow extends JFrame {
             }
         });
 
-        // ---- Save button ----
+        // Save products
         saveButton.addActionListener(e -> {
             JFileChooser chooser = new JFileChooser();
             int result = chooser.showSaveDialog(this);
@@ -122,30 +146,27 @@ public class StoreWindow extends JFrame {
             }
         });
 
-        // ---- Manage catalog ----
+        // Manage catalog
         manageCatalogButton.addActionListener(e -> {
             CatalogManagementWindow dialog = new CatalogManagementWindow(this, controller);
             dialog.setVisible(true);
-
-            // refresh after manager changes catalog
             setCatalogProducts(controller.getAvailableProducts());
         });
 
+        // Order history
         historyButton.addActionListener(e -> {
             OrderHistoryWindow dialog = new OrderHistoryWindow(this, controller);
             dialog.setVisible(true);
         });
-
 
         ioButtons.add(loadButton);
         ioButtons.add(saveButton);
         ioButtons.add(manageCatalogButton);
         ioButtons.add(historyButton);
 
-
         topBar.add(ioButtons, BorderLayout.EAST);
 
-        // -------- Search + Category Filter bar --------
+        // Search + Category Filter bar
         JPanel filtersBar = new JPanel(new FlowLayout(FlowLayout.LEFT));
 
         filtersBar.add(new JLabel("Search:"));
@@ -158,7 +179,6 @@ public class StoreWindow extends JFrame {
 
         topBar.add(filtersBar, BorderLayout.CENTER);
 
-        // live search
         searchField.getDocument().addDocumentListener(new javax.swing.event.DocumentListener() {
             private void apply() { applyFilters(); }
             @Override public void insertUpdate(javax.swing.event.DocumentEvent e) { apply(); }
@@ -166,16 +186,13 @@ public class StoreWindow extends JFrame {
             @Override public void changedUpdate(javax.swing.event.DocumentEvent e) { apply(); }
         });
 
-        // clear button
         clearSearchButton.addActionListener(e -> {
             searchField.setText("");
-            categoryCombo.setSelectedIndex(0); // All
+            categoryCombo.setSelectedIndex(0);
             applyFilters();
         });
 
-        // category change
         categoryCombo.addActionListener(e -> applyFilters());
-
 
         add(topBar, BorderLayout.NORTH);
 
@@ -211,12 +228,10 @@ public class StoreWindow extends JFrame {
             detailsPanel.setProduct(detailsPanel.getProduct());
         });
 
-        // Checkout button: perform order and show confirmation
         cartPanel.addCheckoutListener(e -> {
             boolean success = controller.checkout();
 
             if (success) {
-                // העגלה התרוקנה – מרעננים תצוגה
                 cartPanel.setItems(controller.getItems());
                 setCatalogProducts(controller.getAvailableProducts());
 
@@ -236,16 +251,12 @@ public class StoreWindow extends JFrame {
             }
         });
 
-
-
-
         rightPanel.add(detailsPanel);
         rightPanel.add(Box.createVerticalStrut(10));
         rightPanel.add(cartPanel);
 
         add(rightPanel, BorderLayout.EAST);
 
-        // connect "Add to cart" button from details panel
         detailsPanel.addAddToCartListener(e -> {
             Product p = detailsPanel.getProduct();
             if (p == null) return;
@@ -253,12 +264,11 @@ public class StoreWindow extends JFrame {
             int quantity = 1;
             boolean success = controller.addToCart(p, quantity);
 
-
             if (success) {
                 cartPanel.setItems(controller.getItems());
-                detailsPanel.showAddedFeedback(); // feedback disappears after 1 second
-                detailsPanel.setProduct(p);       // refresh stock view
-                setCatalogProducts(controller.getAvailableProducts()); // optional: refresh catalog grid
+                detailsPanel.showAddedFeedback();
+                detailsPanel.setProduct(p);
+                setCatalogProducts(controller.getAvailableProducts());
             } else {
                 JOptionPane.showMessageDialog(
                         this,
@@ -269,13 +279,14 @@ public class StoreWindow extends JFrame {
             }
         });
 
-        // initial catalog
         refreshFiltersAfterCatalogChange();
     }
 
-
-
-
+    /**
+     * Sets the catalog products and rebuilds the grid UI.
+     *
+     * @param products products to display
+     */
     public void setCatalogProducts(List<Product> products) {
         catalogPanel.removeAll();
 
@@ -296,6 +307,11 @@ public class StoreWindow extends JFrame {
         catalogPanel.repaint();
     }
 
+    /**
+     * Rebuilds the category combo box from the given products.
+     *
+     * @param products products list
+     */
     private void rebuildCategoryCombo(List<Product> products) {
         categoryCombo.removeAllItems();
         categoryCombo.addItem("All");
@@ -314,8 +330,11 @@ public class StoreWindow extends JFrame {
         }
     }
 
+    /**
+     * Applies search and category filters and refreshes the catalog grid.
+     */
     private void applyFilters() {
-        String text = searchField.getText() == null
+        String text = (searchField.getText() == null)
                 ? ""
                 : searchField.getText().trim().toLowerCase();
 
@@ -327,11 +346,9 @@ public class StoreWindow extends JFrame {
         for (Product p : all) {
             if (p == null) continue;
 
-            String name = p.getName() == null ? "" : p.getName();
+            String name = (p.getName() == null) ? "" : p.getName();
 
-            boolean matchName =
-                    text.isEmpty() ||
-                            name.toLowerCase().contains(text);
+            boolean matchName = text.isEmpty() || name.toLowerCase().contains(text);
 
             boolean matchCategory =
                     selected == null ||
@@ -346,10 +363,11 @@ public class StoreWindow extends JFrame {
         setCatalogProducts(filtered);
     }
 
+    /**
+     * Refreshes category options and applies the current filters.
+     */
     private void refreshFiltersAfterCatalogChange() {
         rebuildCategoryCombo(controller.getAvailableProducts());
         applyFilters();
     }
-
-
 }
