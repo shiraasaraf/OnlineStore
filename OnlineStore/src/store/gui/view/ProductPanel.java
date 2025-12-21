@@ -4,10 +4,7 @@ import store.products.Product;
 
 import javax.swing.*;
 import java.awt.*;
-import  java.net.URL;
-import java.awt.Graphics2D;
-import java.awt.image.BufferedImage;
-import java.awt.RenderingHints;
+import java.net.URL;
 
 
 public class ProductPanel extends JPanel {
@@ -23,8 +20,8 @@ public class ProductPanel extends JPanel {
     private static final int CARD_H = 220;
 
     // השטח לתמונה בתוך הכרטיס (הטקסט יישב מתחת)
-    private static final int IMG_W = 168;
-    private static final int IMG_H = 218;
+    private static final int IMG_W = 169;
+    private static final int IMG_H = 219;
 
     public ProductPanel(Product product) {
         this.product = product;
@@ -92,72 +89,20 @@ public class ProductPanel extends JPanel {
                 return;
             }
 
-            ImageIcon originalIcon = new ImageIcon(url);
+            ImageIcon icon = new ImageIcon(url);
 
-            int maxW = 168; // המידות שקבעת
-            int maxH = 218;
+            int w = 169;  // המידות שבחרת
+            int h = 219;
+
+            Image scaled = icon.getImage().getScaledInstance(w, h, Image.SCALE_SMOOTH);
 
             imageLabel.setText("");
-            imageLabel.setIcon(scaleHighQuality(originalIcon, maxW, maxH));
+            imageLabel.setIcon(new ImageIcon(scaled));
 
         } catch (Exception e) {
             imageLabel.setIcon(null);
             imageLabel.setText("Image error");
         }
-    }
-
-    private ImageIcon scaleHighQuality(ImageIcon src, int maxW, int maxH) {
-        int w = src.getIconWidth();
-        int h = src.getIconHeight();
-
-        double scale = Math.min((double) maxW / w, (double) maxH / h);
-        scale = Math.min(scale, 1.0); // לא להגדיל מעבר למקור
-
-        int newW = (int) Math.round(w * scale);
-        int newH = (int) Math.round(h * scale);
-
-        BufferedImage out =
-                new BufferedImage(newW, newH, BufferedImage.TYPE_INT_RGB);
-
-        Graphics2D g2 = out.createGraphics();
-        g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
-                RenderingHints.VALUE_INTERPOLATION_BICUBIC);
-        g2.setRenderingHint(RenderingHints.KEY_RENDERING,
-                RenderingHints.VALUE_RENDER_QUALITY);
-        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING,
-                RenderingHints.VALUE_ANTIALIAS_ON);
-
-        g2.drawImage(src.getImage(), 0, 0, newW, newH, null);
-        g2.dispose();
-
-        return new ImageIcon(out);
-    }
-
-
-
-    //soft scale for better interpolation and minimize pixels
-    private ImageIcon scaleToFit(Image src, int maxW, int maxH) {
-        int w = src.getWidth(null);
-        int h = src.getHeight(null);
-        if (w <= 0 || h <= 0) return new ImageIcon(src);
-
-        double scale = Math.min((double) maxW / w, (double) maxH / h);
-        int newW = Math.max(1, (int) Math.round(w * scale));
-        int newH = Math.max(1, (int) Math.round(h * scale));
-
-        // סקייל ראשוני
-        Image scaled = src.getScaledInstance(newW, newH, Image.SCALE_SMOOTH);
-
-        // ציור מחדש עם רמזים איכותיים (מפחית פיקסול)
-        BufferedImage out = new BufferedImage(newW, newH, BufferedImage.TYPE_INT_ARGB);
-        Graphics2D g2 = out.createGraphics();
-        g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC);
-        g2.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
-        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-        g2.drawImage(scaled, 0, 0, null);
-        g2.dispose();
-
-        return new ImageIcon(out);
     }
 
 
