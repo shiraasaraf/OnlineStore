@@ -51,7 +51,7 @@ public class StoreWindow extends JFrame {
         manageCatalogButton.setEnabled(isManager);
         loadButton.setEnabled(isManager);
         saveButton.setEnabled(isManager);
-        historyButton.setEnabled(controller.canManage());
+        historyButton.setEnabled(isManager);
 
 
         // ---- Load button ----
@@ -150,7 +150,7 @@ public class StoreWindow extends JFrame {
             Product p = (Product) btn.getClientProperty("product");
             if (p == null) return;
 
-            boolean removed = controller.removeFromCart(p); // נוסיף מתודה כזו
+            boolean removed = controller.removeFromCart(p);
             if (!removed) {
                 JOptionPane.showMessageDialog(
                         this,
