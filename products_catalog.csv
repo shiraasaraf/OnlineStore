@@ -1,0 +1,9 @@
+name,price,stock,description,category,imagePath
+Jeans,119.000000,80,Blue denim jeans,CLOTHING,
+Harry Potter,39.900000,60,Fantasy book for teens,BOOKS,
+The Hobbit,35.500000,40,Classic fantasy adventure,BOOKS,
+Headphones,399.000000,48,Noise cancelling headphones,ELECTRONICS,
+Gaming Laptop,4999.990000,7,High performance gaming laptop,ELECTRONICS,
+Office Laptop,2899.000000,5,Lightweight work laptop,ELECTRONICS,
+T-Shirt,49.900000,30,White cotton shirt,CLOTHING,
+Smartphone X,2999.000000,9,Latest modern smartphone,ELECTRONICS,
