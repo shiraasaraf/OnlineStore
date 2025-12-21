@@ -16,8 +16,11 @@ public class LoginWindow extends JFrame {
         setLocationRelativeTo(null);
         setLayout(new BorderLayout(10, 10));
 
+        setResizable(false);
+
         JLabel title = new JLabel("Choose mode", SwingConstants.CENTER);
         add(title, BorderLayout.NORTH);
+
 
         JPanel buttons = new JPanel(new GridLayout(2, 1, 10, 10));
         customerButton = new JButton("Enter as Customer");

@@ -37,9 +37,24 @@ public class ProductPanel extends JPanel {
     }
 
     private void loadImage() {
-        // דורש שיהיה ב-Product imagePath, בינתיים default
+        String path = product.getImagePath(); // צריך להיות קיים ב-Product
+        if (path == null || path.isBlank()) {
+            imageLabel.setText("No Image");
+            return;
+        }
 
+        // אם path הוא כמו: "images/phone.png" תחת resources
+        URL url = getClass().getClassLoader().getResource(path);
+        if (url == null) {
+            imageLabel.setText("Image not found");
+            return;
+        }
+
+        ImageIcon icon = new ImageIcon(url);
+        Image scaled = icon.getImage().getScaledInstance(140, 100, Image.SCALE_SMOOTH);
+        imageLabel.setIcon(new ImageIcon(scaled));
     }
+
 
     public Product getProduct() {
         return product;

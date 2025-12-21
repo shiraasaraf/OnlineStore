@@ -26,6 +26,8 @@ public abstract class Product implements StoreEntity, PricedItem, StockManageabl
     private String description;
     private Category category;
     private Color color;
+    private String imagePath;
+    //path does not start with / . The path is relative to resources.
 
     /**
      * Constructs a new Product and applies validation to all parameters.
@@ -40,7 +42,7 @@ public abstract class Product implements StoreEntity, PricedItem, StockManageabl
      * @param color       product color (default used if null)
      */
     public Product(String name, double price, int stock, String description,
-                   Category category, Color color) {
+                   Category category, Color color, String imagePath) {
 
         //default values
         this.name = "Unknown product";
@@ -49,6 +51,7 @@ public abstract class Product implements StoreEntity, PricedItem, StockManageabl
         this.description = "";
         this.category = Category.BOOKS; //Randomly selected because it must be from Category enum
         this.color = Color.BLACK; //Randomly selected because it must be from Color class
+        this.imagePath = "images/default.jpg";
 
         // name – only if non-null and not blank
         if (name != null && !name.trim().isEmpty()) {
@@ -301,6 +304,9 @@ public abstract class Product implements StoreEntity, PricedItem, StockManageabl
                 this.category == other.category;
     }
 
+    public String getImagePath() {
+        return imagePath;
+    }
 
 }
 
