@@ -99,7 +99,7 @@ public class StoreEngine {
      *
      * @return list of available products
      */
-    public List<Product> getAvailableProducts() {
+    public synchronized List<Product> getAvailableProducts() {
         List<Product> available = new ArrayList<>();
         for (Product p : products) {
             if (p.getStock() > 0) {
@@ -114,7 +114,7 @@ public class StoreEngine {
      *
      * @return list of all products
      */
-    public List<Product> getAllProducts() {
+    public synchronized List<Product> getAllProducts() {
         return new ArrayList<>(products);
     }
 
@@ -162,7 +162,7 @@ public class StoreEngine {
      *
      * @return list of all orders
      */
-    public List<Order> getAllOrders() {
+    public synchronized List<Order> getAllOrders() {
         return new ArrayList<>(allOrders);
     }
 
