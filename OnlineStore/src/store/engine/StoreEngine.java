@@ -26,6 +26,9 @@ import java.util.List;
  */
 public class StoreEngine {
 
+    private static final Object ORDER_FILE_LOCK = new Object();
+
+
     /** Singleton instance. */
     private static StoreEngine instance = null;
 
@@ -199,34 +202,37 @@ public class StoreEngine {
     private void appendOrderToHistoryFile(Order order) {
         if (order == null) return;
 
-        try (BufferedWriter writer =
-                     new BufferedWriter(new FileWriter(ORDER_HISTORY_FILE, true))) {
+        synchronized (ORDER_FILE_LOCK) {
+            try (BufferedWriter writer =
+                         new BufferedWriter(new FileWriter(ORDER_HISTORY_FILE, true))) {
 
-            StringBuilder itemsSummary = new StringBuilder();
-            for (CartItem item : order.getItems()) {
-                if (item.getProduct() == null) continue;
+                StringBuilder itemsSummary = new StringBuilder();
+                for (CartItem item : order.getItems()) {
+                    if (item.getProduct() == null) continue;
 
-                itemsSummary.append(item.getProduct().getName())
-                        .append(" x")
-                        .append(item.getQuantity())
-                        .append(";");
+                    itemsSummary.append(item.getProduct().getName())
+                            .append(" x")
+                            .append(item.getQuantity())
+                            .append(";");
+                }
+
+                String line = String.format(
+                        "%d,%.2f,%s,%s",
+                        order.getOrderID(),
+                        order.getTotalAmount(),
+                        order.getCreatedAt(),
+                        itemsSummary
+                );
+
+                writer.write(line);
+                writer.newLine();
+
+            } catch (IOException e) {
+                e.printStackTrace();
             }
-
-            String line = String.format(
-                    "%d,%.2f,%s,%s",
-                    order.getOrderID(),
-                    order.getTotalAmount(),
-                    order.getCreatedAt(),
-                    itemsSummary
-            );
-
-            writer.write(line);
-            writer.newLine();
-
-        } catch (IOException e) {
-            e.printStackTrace();
         }
     }
+
 
     /**
      * Loads order history from file if it exists.

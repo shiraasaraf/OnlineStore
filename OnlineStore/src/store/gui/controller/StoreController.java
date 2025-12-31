@@ -6,6 +6,7 @@
 
 package store.gui.controller;
 
+import store.cart.Cart;
 import store.cart.CartItem;
 import store.core.Customer;
 import store.core.Manager;
@@ -16,6 +17,7 @@ import store.products.Product;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -25,6 +27,9 @@ import java.util.List;
  * </p>
  */
 public class StoreController {
+
+    private static final Object ENGINE_LOCK = new Object();
+    private static final Object PRODUCT_FILE_LOCK = new Object();
 
     /** Store engine (model). */
     private final StoreEngine engine;
@@ -58,8 +63,11 @@ public class StoreController {
      * @return list of available products
      */
     public List<Product> getAvailableProducts() {
-        return engine.getAvailableProducts();
+        synchronized (ENGINE_LOCK) {
+            return engine.getAvailableProducts();
+        }
     }
+
 
     /**
      * Returns all products in the catalog.
@@ -67,8 +75,11 @@ public class StoreController {
      * @return list of all products
      */
     public List<Product> getAllProducts() {
-        return engine.getAllProducts();
+        synchronized (ENGINE_LOCK) {
+            return engine.getAllProducts();
+        }
     }
+
 
     /**
      * Removes a product from the catalog.
@@ -77,8 +88,11 @@ public class StoreController {
      * @return true if removed, false otherwise
      */
     public boolean removeProduct(Product product) {
-        return engine.removeProduct(product);
+        synchronized (ENGINE_LOCK) {
+            return engine.removeProduct(product);
+        }
     }
+
 
     /**
      * Loads products from a file and adds them to the engine.
@@ -87,11 +101,20 @@ public class StoreController {
      * @throws IOException if reading fails
      */
     public void loadProductsFromFile(File file) throws IOException {
-        List<Product> loaded = ProductCatalogIO.loadProductsFromFile(file);
-        for (Product p : loaded) {
-            engine.addProduct(p);
+        List<Product> loaded;
+
+        synchronized (PRODUCT_FILE_LOCK) {
+            loaded = ProductCatalogIO.loadProductsFromFile(file);
+        }
+
+        synchronized (ENGINE_LOCK) {
+            for (Product p : loaded) {
+                engine.addProduct(p);
+            }
         }
     }
+
+
 
     /**
      * Saves current products to a file.
@@ -100,8 +123,18 @@ public class StoreController {
      * @throws IOException if writing fails
      */
     public void saveProductsToFile(File file) throws IOException {
-        ProductCatalogIO.saveProductsToFile(file, engine.getAllProducts());
+        List<Product> snapshot;
+
+        synchronized (ENGINE_LOCK) {
+            snapshot = engine.getAllProducts();
+        }
+
+        synchronized (PRODUCT_FILE_LOCK) {
+            ProductCatalogIO.saveProductsToFile(file, snapshot);
+        }
     }
+
+
 
     // ---------------------------------------------------------------------
     // Orders
@@ -125,8 +158,62 @@ public class StoreController {
         if (customer == null) {
             return false;
         }
-        return customer.checkout();
+
+        synchronized (ENGINE_LOCK) {
+            Cart cart = customer.getCart();
+            if (cart == null || cart.isEmpty()) {
+                return false;
+            }
+
+            List<CartItem> items = cart.getItems();
+
+            // 1) Validate stock
+            for (CartItem item : items) {
+                Product p = item.getProduct();
+                int qty = item.getQuantity();
+
+                if (p == null || qty <= 0) {
+                    return false;
+                }
+                if (p.getStock() < qty) {
+                    return false;
+                }
+            }
+
+            // 2) Decrease stock
+            List<CartItem> decreased = new ArrayList<>();
+            for (CartItem item : items) {
+                Product p = item.getProduct();
+                int qty = item.getQuantity();
+
+                boolean ok = p.decreaseStock(qty);
+                if (!ok) {
+                    // rollback
+                    for (CartItem prev : decreased) {
+                        Product prevP = prev.getProduct();
+                        prevP.increaseStock(prev.getQuantity());
+                    }
+                    return false;
+                }
+                decreased.add(item);
+            }
+
+            // 3) Create order (existing flow)
+            boolean ok = customer.checkout();
+
+            if (!ok) {
+                // rollback if checkout failed
+                for (CartItem item : decreased) {
+                    Product p = item.getProduct();
+                    p.increaseStock(item.getQuantity());
+                }
+            }
+
+            return ok;
+        }
     }
+
+
 
     // ---------------------------------------------------------------------
     // Cart (Customer)
@@ -140,8 +227,11 @@ public class StoreController {
      * @return true if added, false otherwise
      */
     public boolean addToCart(Product p, int quantity) {
-        return customer.addToCart(p, quantity);
+        synchronized (ENGINE_LOCK) {
+            return customer.addToCart(p, quantity);
+        }
     }
+
 
     /**
      * Returns current cart items.
@@ -149,7 +239,9 @@ public class StoreController {
      * @return list of cart items
      */
     public List<CartItem> getItems() {
-        return customer.getItems();
+        synchronized (ENGINE_LOCK) {
+            return customer.getItems();
+        }
     }
 
     /**
@@ -159,7 +251,9 @@ public class StoreController {
      * @return true if removed, false otherwise
      */
     public boolean removeFromCart(Product p) {
-        return customer.removeFromCart(p);
+        synchronized (ENGINE_LOCK) {
+            return customer.removeFromCart(p);
+        }
     }
 
     // ---------------------------------------------------------------------
@@ -174,4 +268,28 @@ public class StoreController {
     public boolean canManage() {
         return manager != null;
     }
+
+    public boolean addProduct(Product product) {
+        if (!canManage() || product == null) return false;
+        synchronized (ENGINE_LOCK) {
+            engine.addProduct(product);
+            return true;
+        }
+    }
+
+    public boolean increaseStock(Product product, int amount) {
+        if (!canManage() || product == null || amount <= 0) return false;
+        synchronized (ENGINE_LOCK) {
+            product.increaseStock(amount);
+            return true;
+        }
+    }
+
+    public boolean decreaseStock(Product product, int amount) {
+        if (!canManage() || product == null || amount <= 0) return false;
+        synchronized (ENGINE_LOCK) {
+            return product.decreaseStock(amount);
+        }
+    }
+
 }
