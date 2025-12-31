@@ -6,6 +6,7 @@
 
 package store.app;
 
+import store.gui.view.LauncherWindow;
 import store.core.Customer;
 import store.core.Manager;
 import store.engine.StoreEngine;
@@ -90,7 +91,9 @@ public class Main {
 
 
 
-            login.setVisible(true);
+            LauncherWindow launcher = new LauncherWindow(engine);
+            launcher.setVisible(true);
+
         });
     }
 }

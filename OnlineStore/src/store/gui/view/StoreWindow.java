@@ -71,7 +71,7 @@ public class StoreWindow extends JFrame {
 
         setTitle("Online Store");
         setSize(1000, 650);
-        setDefaultCloseOperation(EXIT_ON_CLOSE);
+        setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
         setExtendedState(JFrame.MAXIMIZED_BOTH);
         setLayout(new BorderLayout(10, 10));
 
