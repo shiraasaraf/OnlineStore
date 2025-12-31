@@ -10,8 +10,15 @@ import store.gui.controller.StoreController;
 import store.products.Category;
 import store.products.Product;
 
+import store.cart.CartItem;
+import store.gui.util.WindowWorker;
+
 import javax.swing.*;
 import java.awt.*;
+
+import java.awt.event.WindowAdapter;
+import java.awt.event.WindowEvent;
+
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.io.File;
@@ -26,6 +33,8 @@ import java.util.List;
  * </p>
  */
 public class StoreWindow extends JFrame {
+
+    private final WindowWorker worker;
 
     /** Catalog grid panel. */
     private final JPanel catalogPanel;
@@ -69,6 +78,22 @@ public class StoreWindow extends JFrame {
 
         this.controller = storeController;
 
+        String roleName = controller.canManage() ? "Manager" : "Customer";
+        this.worker = new WindowWorker(roleName + "-WindowWorker-" + System.identityHashCode(this));
+
+
+        addWindowListener(new WindowAdapter() {
+            @Override
+            public void windowClosed(WindowEvent e) {
+                worker.close();
+            }
+
+            @Override
+            public void windowClosing(WindowEvent e) {
+                dispose();
+            }
+        });
+
         setTitle("Online Store");
         setSize(1000, 650);
         setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
@@ -99,24 +124,34 @@ public class StoreWindow extends JFrame {
             if (result != JFileChooser.APPROVE_OPTION) return;
 
             File selectedFile = chooser.getSelectedFile();
-            try {
-                controller.loadProductsFromFile(selectedFile);
-                setCatalogProducts(controller.getAvailableProducts());
 
-                JOptionPane.showMessageDialog(
-                        this,
-                        "Products loaded successfully.",
-                        "Success",
-                        JOptionPane.INFORMATION_MESSAGE
-                );
-            } catch (IOException ex) {
-                JOptionPane.showMessageDialog(
-                        this,
-                        "Failed to load products from file:\n" + ex.getMessage(),
-                        "IO Error",
-                        JOptionPane.ERROR_MESSAGE
-                );
-            }
+
+            worker.runAsync(
+                    () -> {
+                        try {
+                            controller.loadProductsFromFile(selectedFile);
+                            return controller.getAvailableProducts();
+                        } catch (IOException ex) {
+                            throw new RuntimeException("Failed to load products from file", ex);
+                        }
+                    },
+                    products -> {
+                        setCatalogProducts(products);
+                        rebuildCategoryCombo(controller.getAvailableProducts());
+                        JOptionPane.showMessageDialog(
+                                this,
+                                "Products loaded successfully.",
+                                "Success",
+                                JOptionPane.INFORMATION_MESSAGE
+                        );
+                    },
+                    ex -> JOptionPane.showMessageDialog(
+                            this,
+                            "Failed to load products from file:\n" + ex.getMessage(),
+                            "IO Error",
+                            JOptionPane.ERROR_MESSAGE
+                    )
+            );
         });
 
         // Save products
@@ -127,23 +162,27 @@ public class StoreWindow extends JFrame {
 
             File selectedFile = chooser.getSelectedFile();
 
-            try {
-                controller.saveProductsToFile(selectedFile);
-
-                JOptionPane.showMessageDialog(
-                        this,
-                        "Products saved successfully.",
-                        "Success",
-                        JOptionPane.INFORMATION_MESSAGE
-                );
-            } catch (IOException ex) {
-                JOptionPane.showMessageDialog(
-                        this,
-                        "Failed to save products to file:\n" + ex.getMessage(),
-                        "IO Error",
-                        JOptionPane.ERROR_MESSAGE
-                );
-            }
+            worker.runAsync(
+                    () -> {
+                        try {
+                            controller.saveProductsToFile(selectedFile);
+                        } catch (IOException ex) {
+                            throw new RuntimeException("Failed to save products to file", ex);
+                        }
+                    },
+                    () -> JOptionPane.showMessageDialog(
+                            this,
+                            "Products saved successfully.",
+                            "Success",
+                            JOptionPane.INFORMATION_MESSAGE
+                    ),
+                    ex -> JOptionPane.showMessageDialog(
+                            this,
+                            "Failed to save products to file:\n" + ex.getMessage(),
+                            "IO Error",
+                            JOptionPane.ERROR_MESSAGE
+                    )
+            );
         });
 
         // Manage catalog
@@ -212,44 +251,71 @@ public class StoreWindow extends JFrame {
             Product p = (Product) btn.getClientProperty("product");
             if (p == null) return;
 
-            boolean removed = controller.removeFromCart(p);
-            if (!removed) {
-                JOptionPane.showMessageDialog(
-                        this,
-                        "Failed to remove item from cart",
-                        "Error",
-                        JOptionPane.ERROR_MESSAGE
-                );
-                return;
-            }
+            worker.runAsync(
+                    () -> {
+                        boolean removed = controller.removeFromCart(p);
+                        return new UiSnapshot(removed, controller.getItems(), controller.getAvailableProducts());
+                    },
+                    snapshot -> {
+                        if (!snapshot.success) {
+                            JOptionPane.showMessageDialog(
+                                    this,
+                                    "Failed to remove item from cart.",
+                                    "Error",
+                                    JOptionPane.ERROR_MESSAGE
+                            );
+                            return;
+                        }
 
-            cartPanel.setItems(controller.getItems());
-            setCatalogProducts(controller.getAvailableProducts());
-            detailsPanel.setProduct(detailsPanel.getProduct());
+                        cartPanel.setItems(snapshot.items);
+                        setCatalogProducts(snapshot.products);
+                        detailsPanel.setProduct(detailsPanel.getProduct());
+                    },
+                    ex -> JOptionPane.showMessageDialog(
+                            this,
+                            "Error: " + ex.getMessage(),
+                            "Error",
+                            JOptionPane.ERROR_MESSAGE
+                    )
+            );
         });
+
 
         cartPanel.addCheckoutListener(e -> {
-            boolean success = controller.checkout();
+            worker.runAsync(
+                    () -> {
+                        boolean ok = controller.checkout();
+                        return new UiSnapshot(ok, controller.getItems(), controller.getAvailableProducts());
+                    },
+                    snapshot -> {
+                        if (snapshot.success) {
+                            cartPanel.setItems(snapshot.items);
+                            setCatalogProducts(snapshot.products);
 
-            if (success) {
-                cartPanel.setItems(controller.getItems());
-                setCatalogProducts(controller.getAvailableProducts());
-
-                JOptionPane.showMessageDialog(
-                        this,
-                        "Order completed successfully!",
-                        "Checkout",
-                        JOptionPane.INFORMATION_MESSAGE
-                );
-            } else {
-                JOptionPane.showMessageDialog(
-                        this,
-                        "Cart is empty. Add items before checkout.",
-                        "Checkout",
-                        JOptionPane.WARNING_MESSAGE
-                );
-            }
+                            JOptionPane.showMessageDialog(
+                                    this,
+                                    "Order completed successfully!",
+                                    "Checkout",
+                                    JOptionPane.INFORMATION_MESSAGE
+                            );
+                        } else {
+                            JOptionPane.showMessageDialog(
+                                    this,
+                                    "Cart is empty. Add items before checkout.",
+                                    "Checkout",
+                                    JOptionPane.WARNING_MESSAGE
+                            );
+                        }
+                    },
+                    ex -> JOptionPane.showMessageDialog(
+                            this,
+                            "Error: " + ex.getMessage(),
+                            "Error",
+                            JOptionPane.ERROR_MESSAGE
+                    )
+            );
         });
+
 
         rightPanel.add(detailsPanel);
         rightPanel.add(Box.createVerticalStrut(10));
@@ -262,21 +328,34 @@ public class StoreWindow extends JFrame {
             if (p == null) return;
 
             int quantity = 1;
-            boolean success = controller.addToCart(p, quantity);
+            worker.runAsync(
+                    () -> {
+                        boolean added = controller.addToCart(p, quantity);
+                        return new UiSnapshot(added, controller.getItems(), controller.getAvailableProducts());
+                    },
+                    snapshot -> {
+                        if (snapshot.success) {
+                            cartPanel.setItems(snapshot.items);
+                            detailsPanel.showAddedFeedback();
+                            detailsPanel.setProduct(p);
+                            setCatalogProducts(snapshot.products);
+                        } else {
+                            JOptionPane.showMessageDialog(
+                                    this,
+                                    "Could not add product to cart.",
+                                    "Error",
+                                    JOptionPane.ERROR_MESSAGE
+                            );
+                        }
+                    },
+                    ex -> JOptionPane.showMessageDialog(
+                            this,
+                            "Error: " + ex.getMessage(),
+                            "Error",
+                            JOptionPane.ERROR_MESSAGE
+                    )
+            );
 
-            if (success) {
-                cartPanel.setItems(controller.getItems());
-                detailsPanel.showAddedFeedback();
-                detailsPanel.setProduct(p);
-                setCatalogProducts(controller.getAvailableProducts());
-            } else {
-                JOptionPane.showMessageDialog(
-                        this,
-                        "Could not add product to cart",
-                        "Error",
-                        JOptionPane.ERROR_MESSAGE
-                );
-            }
         });
 
         refreshFiltersAfterCatalogChange();
@@ -370,4 +449,17 @@ public class StoreWindow extends JFrame {
         rebuildCategoryCombo(controller.getAvailableProducts());
         applyFilters();
     }
+
+    private static final class UiSnapshot {
+        private final boolean success;
+        private final java.util.List<CartItem> items;
+        private final java.util.List<Product> products;
+
+        private UiSnapshot(boolean success, java.util.List<CartItem> items, java.util.List<Product> products) {
+            this.success = success;
+            this.items = items;
+            this.products = products;
+        }
+    }
+
 }
