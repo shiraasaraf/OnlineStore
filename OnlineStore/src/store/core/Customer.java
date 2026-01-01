@@ -114,36 +114,37 @@ public class Customer extends User {
 
 
     /**
-     * Performs checkout for the customer's cart.
+     * Performs checkout for the customer's cart using the given store engine.
      * If the cart is empty, checkout cannot be completed.
      * Otherwise, the StoreEngine creates an order from the cart.
      * If the order is successfully created, it is added to the order history
      * and the cart is cleared.
      *
+     * @param engine store engine to create the order with
      * @return true if the checkout succeeded, false otherwise
      */
-    public boolean checkout(){
+    public boolean checkout(StoreEngine engine){
+
+        if(engine == null){
+            return false;
+        }
 
         // if the cart is empty, there is nothing to checkout
         if(cart.isEmpty()){
             return false;
         }
 
-        //Getting the store engine by calling Singleton
-        StoreEngine engine = StoreEngine.getInstance();
-
-        //Creating an order through the store engine
+        // Creating an order through the store engine
         Order order = engine.createOrderFromCart(cart);
 
-        // If the order failed — return false
         if(order == null) {
             return false;
         }
 
-        //Add to the orders history
+        // Add to the orders history
         orderHistory.add(order);
 
-        //Clean the cart
+        // Clean the cart
         cart.clear();
 
         return true;

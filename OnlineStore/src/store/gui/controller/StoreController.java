@@ -24,14 +24,17 @@ import java.util.List;
  * Controller for the store GUI.
  * <p>
  * Bridges between the view layer and the model (engine/customer/manager).
+ * Thread-safety is handled here by synchronizing critical operations on the shared engine.
  * </p>
  */
 public class StoreController {
 
-    private static final Object ENGINE_LOCK = new Object();
+    /**
+     * Lock for file operations (prevents parallel load/save to the same file).
+     */
     private static final Object PRODUCT_FILE_LOCK = new Object();
 
-    /** Store engine (model). */
+    /** Store engine (model). Shared among all windows. */
     private final StoreEngine engine;
 
     /** Current customer. */
@@ -43,7 +46,7 @@ public class StoreController {
     /**
      * Constructs a controller for the given users and engine.
      *
-     * @param engine   store engine
+     * @param engine   store engine (shared model)
      * @param customer current customer
      * @param manager  current manager (may be null)
      */
@@ -63,11 +66,10 @@ public class StoreController {
      * @return list of available products
      */
     public List<Product> getAvailableProducts() {
-        synchronized (ENGINE_LOCK) {
+        synchronized (engine) {
             return engine.getAvailableProducts();
         }
     }
-
 
     /**
      * Returns all products in the catalog.
@@ -75,11 +77,10 @@ public class StoreController {
      * @return list of all products
      */
     public List<Product> getAllProducts() {
-        synchronized (ENGINE_LOCK) {
+        synchronized (engine) {
             return engine.getAllProducts();
         }
     }
-
 
     /**
      * Removes a product from the catalog.
@@ -88,14 +89,15 @@ public class StoreController {
      * @return true if removed, false otherwise
      */
     public boolean removeProduct(Product product) {
-        synchronized (ENGINE_LOCK) {
+        synchronized (engine) {
             return engine.removeProduct(product);
         }
     }
 
-
     /**
      * Loads products from a file and adds them to the engine.
+     * File read is synchronized to prevent parallel access to the same file.
+     * Adding into the engine is synchronized to keep the shared model consistent.
      *
      * @param file source file
      * @throws IOException if reading fails
@@ -107,17 +109,16 @@ public class StoreController {
             loaded = ProductCatalogIO.loadProductsFromFile(file);
         }
 
-        synchronized (ENGINE_LOCK) {
+        synchronized (engine) {
             for (Product p : loaded) {
                 engine.addProduct(p);
             }
         }
     }
 
-
-
     /**
      * Saves current products to a file.
+     * Takes a snapshot under engine lock, then writes under file lock.
      *
      * @param file destination file
      * @throws IOException if writing fails
@@ -125,7 +126,7 @@ public class StoreController {
     public void saveProductsToFile(File file) throws IOException {
         List<Product> snapshot;
 
-        synchronized (ENGINE_LOCK) {
+        synchronized (engine) {
             snapshot = engine.getAllProducts();
         }
 
@@ -133,8 +134,6 @@ public class StoreController {
             ProductCatalogIO.saveProductsToFile(file, snapshot);
         }
     }
-
-
 
     // ---------------------------------------------------------------------
     // Orders
@@ -146,11 +145,15 @@ public class StoreController {
      * @return list of all orders
      */
     public List<Order> getAllOrders() {
-        return engine.getAllOrders();
+        synchronized (engine) {
+            return engine.getAllOrders();
+        }
     }
 
     /**
      * Performs checkout for the current customer.
+     * This method is synchronized on the shared engine to keep:
+     * stock validation + stock decrease + order creation atomic.
      *
      * @return true if checkout succeeded, false otherwise
      */
@@ -159,7 +162,7 @@ public class StoreController {
             return false;
         }
 
-        synchronized (ENGINE_LOCK) {
+        synchronized (engine) {
             Cart cart = customer.getCart();
             if (cart == null || cart.isEmpty()) {
                 return false;
@@ -180,7 +183,7 @@ public class StoreController {
                 }
             }
 
-            // 2) Decrease stock
+            // 2) Decrease stock (with rollback if anything fails)
             List<CartItem> decreased = new ArrayList<>();
             for (CartItem item : items) {
                 Product p = item.getProduct();
@@ -198,8 +201,8 @@ public class StoreController {
                 decreased.add(item);
             }
 
-            // 3) Create order (existing flow)
-            boolean ok = customer.checkout();
+            // 3) Create order through engine + clear cart inside customer
+            boolean ok = customer.checkout(engine);
 
             if (!ok) {
                 // rollback if checkout failed
@@ -213,7 +216,16 @@ public class StoreController {
         }
     }
 
-
+    /**
+     * Returns the current customer's order history.
+     *
+     * @return list of customer's orders
+     */
+    public List<Order> getCustomerOrders() {
+        synchronized (engine) {
+            return customer.getOrderHistory();
+        }
+    }
 
     // ---------------------------------------------------------------------
     // Cart (Customer)
@@ -227,11 +239,10 @@ public class StoreController {
      * @return true if added, false otherwise
      */
     public boolean addToCart(Product p, int quantity) {
-        synchronized (ENGINE_LOCK) {
+        synchronized (engine) {
             return customer.addToCart(p, quantity);
         }
     }
-
 
     /**
      * Returns current cart items.
@@ -239,7 +250,7 @@ public class StoreController {
      * @return list of cart items
      */
     public List<CartItem> getItems() {
-        synchronized (ENGINE_LOCK) {
+        synchronized (engine) {
             return customer.getItems();
         }
     }
@@ -251,13 +262,13 @@ public class StoreController {
      * @return true if removed, false otherwise
      */
     public boolean removeFromCart(Product p) {
-        synchronized (ENGINE_LOCK) {
+        synchronized (engine) {
             return customer.removeFromCart(p);
         }
     }
 
     // ---------------------------------------------------------------------
-    // Permissions
+    // Permissions (Manager)
     // ---------------------------------------------------------------------
 
     /**
@@ -269,27 +280,49 @@ public class StoreController {
         return manager != null;
     }
 
+    /**
+     * Adds a new product to the catalog (manager only).
+     *
+     * @param product product to add
+     * @return true if added, false otherwise
+     */
     public boolean addProduct(Product product) {
         if (!canManage() || product == null) return false;
-        synchronized (ENGINE_LOCK) {
+
+        synchronized (engine) {
             engine.addProduct(product);
             return true;
         }
     }
 
+    /**
+     * Increases stock of an existing product (manager only).
+     *
+     * @param product product to update
+     * @param amount  amount to increase (must be > 0)
+     * @return true if succeeded, false otherwise
+     */
     public boolean increaseStock(Product product, int amount) {
         if (!canManage() || product == null || amount <= 0) return false;
-        synchronized (ENGINE_LOCK) {
+
+        synchronized (engine) {
             product.increaseStock(amount);
             return true;
         }
     }
 
+    /**
+     * Decreases stock of an existing product (manager only).
+     *
+     * @param product product to update
+     * @param amount  amount to decrease (must be > 0)
+     * @return true if succeeded, false otherwise
+     */
     public boolean decreaseStock(Product product, int amount) {
         if (!canManage() || product == null || amount <= 0) return false;
-        synchronized (ENGINE_LOCK) {
+
+        synchronized (engine) {
             return product.decreaseStock(amount);
         }
     }
-
 }

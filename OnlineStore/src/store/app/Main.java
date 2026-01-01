@@ -3,16 +3,10 @@
  * Tamar Nahum, ID 021983812
  * Shira Asaraf, ID 322218439
  */
-
 package store.app;
 
-import store.gui.view.LauncherWindow;
-import store.core.Customer;
-import store.core.Manager;
 import store.engine.StoreEngine;
-import store.gui.controller.StoreController;
-import store.gui.view.LoginWindow;
-import store.gui.view.StoreWindow;
+import store.gui.view.LauncherWindow;
 import store.io.ProductCatalogIO;
 import store.products.Product;
 
@@ -26,9 +20,8 @@ import java.util.List;
  * Application entry point.
  * <p>
  * Initializes the store engine, loads a default product catalog if available,
- * and launches the GUI login window.
+ * and launches the main launcher window (which stays open).
  * </p>
- *
  */
 public class Main {
 
@@ -62,35 +55,7 @@ public class Main {
             // BONUS: load existing orders history
             engine.loadOrderHistoryFromFile();
 
-            LoginWindow login = new LoginWindow();
-
-            // Customer mode
-            login.addCustomerListener(e -> {
-                Customer customer = new Customer("Guest", "guest@example.com");
-                Manager manager = null;
-
-                StoreController controller = new StoreController(engine, customer, manager);
-                StoreWindow window = new StoreWindow(controller);
-
-                login.dispose();
-                window.setVisible(true);
-            });
-
-            // Manager mode
-            login.addManagerListener(e -> {
-                Customer customer = new Customer("Guest", "guest@example.com");
-                Manager manager = new Manager("Admin", "admin@example.com");
-
-                StoreController controller = new StoreController(engine, customer, manager);
-                StoreWindow window = new StoreWindow(controller);
-
-                login.dispose();
-                window.setVisible(true);
-            });
-
-
-
-
+            // Required in EX3: launcher stays open and can open multiple customer/admin windows
             LauncherWindow launcher = new LauncherWindow(engine);
             launcher.setVisible(true);
 
