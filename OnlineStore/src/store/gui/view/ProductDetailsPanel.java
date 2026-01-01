@@ -21,6 +21,7 @@ import java.net.URL;
  * <p>
  * Shows product fields (name, price, stock, description), product image,
  * and an "Add to Cart" button.
+ * Also disables Add to Cart when out of stock and shows a clear status message.
  * </p>
  */
 public class ProductDetailsPanel extends JPanel {
@@ -42,6 +43,9 @@ public class ProductDetailsPanel extends JPanel {
 
     /** Description label (HTML). */
     private JLabel descriptionLabel;
+
+    /** Stock status message (e.g., OUT OF STOCK). */
+    private final JLabel stockStatusLabel = new JLabel(" ");
 
     /** Add-to-cart button. */
     private final JButton addToCartButton = new JButton("Add to Cart");
@@ -77,6 +81,11 @@ public class ProductDetailsPanel extends JPanel {
         add(nameLabel);
         add(priceLabel);
         add(stockLabel);
+
+        // Stock status line (Out of stock)
+        stockStatusLabel.setForeground(new Color(180, 0, 0));
+        stockStatusLabel.setFont(stockStatusLabel.getFont().deriveFont(Font.BOLD));
+        add(stockStatusLabel);
 
         add(Box.createVerticalStrut(8));
 
@@ -139,11 +148,15 @@ public class ProductDetailsPanel extends JPanel {
      * Refreshes all fields based on the current product.
      */
     private void refreshView() {
+        // Always clear feedback on selection change
+        feedbackLabel.setText(" ");
+
         if (product == null) {
             nameLabel.setText("Name: -");
             priceLabel.setText("Price: -");
             stockLabel.setText("Stock: -");
-            descriptionLabel.setText("Description: -");
+            stockStatusLabel.setText(" ");
+            descriptionLabel.setText("<html><b>Description:</b> -</html>");
 
             imageLabel.setIcon(null);
             imageLabel.setText("No Image");
@@ -151,21 +164,26 @@ public class ProductDetailsPanel extends JPanel {
             imageLabel.setVerticalTextPosition(SwingConstants.CENTER);
 
             addToCartButton.setEnabled(false);
-            feedbackLabel.setText(" ");
             return;
         }
 
-        nameLabel.setText("Name: " + product.getDisplayName());
+        nameLabel.setText("Name: " + safeText(product.getDisplayName()));
         priceLabel.setText("Price: " + product.getPrice() + "$");
         stockLabel.setText("Stock: " + product.getStock());
 
         String desc = (product.getDescription() == null) ? "" : product.getDescription();
-        descriptionLabel.setText("<html><b>Description:</b> " + desc + "</html>");
+        descriptionLabel.setText("<html><b>Description:</b> " + safeHtml(desc) + "</html>");
 
         loadProductImage();
 
-        addToCartButton.setEnabled(product.getStock() > 0);
-        feedbackLabel.setText(" ");
+        boolean inStock = product.getStock() > 0;
+        addToCartButton.setEnabled(inStock);
+
+        if (!inStock) {
+            stockStatusLabel.setText("OUT OF STOCK");
+        } else {
+            stockStatusLabel.setText(" ");
+        }
     }
 
     /**
@@ -207,5 +225,22 @@ public class ProductDetailsPanel extends JPanel {
             imageLabel.setIcon(null);
             imageLabel.setText("Image error");
         }
+    }
+
+    /**
+     * Safely formats plain text (non-HTML).
+     */
+    private String safeText(String s) {
+        return (s == null) ? "" : s;
+    }
+
+    /**
+     * Escapes minimal HTML chars for safe rendering inside HTML labels.
+     */
+    private String safeHtml(String s) {
+        if (s == null) return "";
+        return s.replace("&", "&amp;")
+                .replace("<", "&lt;")
+                .replace(">", "&gt;");
     }
 }

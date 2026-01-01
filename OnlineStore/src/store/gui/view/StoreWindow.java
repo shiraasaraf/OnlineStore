@@ -31,6 +31,11 @@ import java.util.List;
  * Displays the product catalog grid, product details panel, and shopping cart panel.
  * Includes search and category filtering, and provides manager actions (load/save/manage catalog).
  * </p>
+ *
+ * <p>
+ * This version shows ALL products in the catalog (including stock = 0).
+ * Products that are out of stock remain visible (UX-friendly).
+ * </p>
  */
 public class StoreWindow extends JFrame {
 
@@ -81,7 +86,6 @@ public class StoreWindow extends JFrame {
         String roleName = controller.canManage() ? "Manager" : "Customer";
         this.worker = new WindowWorker(roleName + "-WindowWorker-" + System.identityHashCode(this));
 
-
         addWindowListener(new WindowAdapter() {
             @Override
             public void windowClosed(WindowEvent e) {
@@ -125,19 +129,18 @@ public class StoreWindow extends JFrame {
 
             File selectedFile = chooser.getSelectedFile();
 
-
             worker.runAsync(
                     () -> {
                         try {
                             controller.loadProductsFromFile(selectedFile);
-                            return controller.getAvailableProducts();
+                            return controller.getAllProducts();
                         } catch (IOException ex) {
                             throw new RuntimeException("Failed to load products from file", ex);
                         }
                     },
                     products -> {
                         setCatalogProducts(products);
-                        rebuildCategoryCombo(controller.getAvailableProducts());
+                        rebuildCategoryCombo(controller.getAllProducts());
                         JOptionPane.showMessageDialog(
                                 this,
                                 "Products loaded successfully.",
@@ -189,7 +192,8 @@ public class StoreWindow extends JFrame {
         manageCatalogButton.addActionListener(e -> {
             CatalogManagementWindow dialog = new CatalogManagementWindow(this, controller);
             dialog.setVisible(true);
-            setCatalogProducts(controller.getAvailableProducts());
+            setCatalogProducts(controller.getAllProducts());
+            refreshFiltersAfterCatalogChange();
         });
 
         // Order history
@@ -254,7 +258,7 @@ public class StoreWindow extends JFrame {
             worker.runAsync(
                     () -> {
                         boolean removed = controller.removeFromCart(p);
-                        return new UiSnapshot(removed, controller.getItems(), controller.getAvailableProducts());
+                        return new UiSnapshot(removed, controller.getItems(), controller.getAllProducts());
                     },
                     snapshot -> {
                         if (!snapshot.success) {
@@ -270,6 +274,7 @@ public class StoreWindow extends JFrame {
                         cartPanel.setItems(snapshot.items);
                         setCatalogProducts(snapshot.products);
                         detailsPanel.setProduct(detailsPanel.getProduct());
+                        applyFilters(); // keep current filters applied
                     },
                     ex -> JOptionPane.showMessageDialog(
                             this,
@@ -280,18 +285,19 @@ public class StoreWindow extends JFrame {
             );
         });
 
-
         cartPanel.addCheckoutListener(e -> {
             worker.runAsync(
                     () -> {
                         boolean ok = controller.checkout();
-                        return new UiSnapshot(ok, controller.getItems(), controller.getAvailableProducts());
+                        return new UiSnapshot(ok, controller.getItems(), controller.getAllProducts());
                     },
                     snapshot -> {
-                        if (snapshot.success) {
-                            cartPanel.setItems(snapshot.items);
-                            setCatalogProducts(snapshot.products);
+                        cartPanel.setItems(snapshot.items);
+                        setCatalogProducts(snapshot.products);
+                        detailsPanel.setProduct(detailsPanel.getProduct());
+                        applyFilters(); // re-apply filters after stock changed
 
+                        if (snapshot.success) {
                             JOptionPane.showMessageDialog(
                                     this,
                                     "Order completed successfully!",
@@ -301,7 +307,7 @@ public class StoreWindow extends JFrame {
                         } else {
                             JOptionPane.showMessageDialog(
                                     this,
-                                    "Cart is empty. Add items before checkout.",
+                                    "Checkout failed (cart empty or stock changed).",
                                     "Checkout",
                                     JOptionPane.WARNING_MESSAGE
                             );
@@ -315,7 +321,6 @@ public class StoreWindow extends JFrame {
                     )
             );
         });
-
 
         rightPanel.add(detailsPanel);
         rightPanel.add(Box.createVerticalStrut(10));
@@ -331,18 +336,20 @@ public class StoreWindow extends JFrame {
             worker.runAsync(
                     () -> {
                         boolean added = controller.addToCart(p, quantity);
-                        return new UiSnapshot(added, controller.getItems(), controller.getAvailableProducts());
+                        return new UiSnapshot(added, controller.getItems(), controller.getAllProducts());
                     },
                     snapshot -> {
+                        cartPanel.setItems(snapshot.items);
+                        setCatalogProducts(snapshot.products);
+                        detailsPanel.setProduct(p);
+                        applyFilters(); // keep current filters applied
+
                         if (snapshot.success) {
-                            cartPanel.setItems(snapshot.items);
                             detailsPanel.showAddedFeedback();
-                            detailsPanel.setProduct(p);
-                            setCatalogProducts(snapshot.products);
                         } else {
                             JOptionPane.showMessageDialog(
                                     this,
-                                    "Could not add product to cart.",
+                                    "Could not add product to cart (maybe out of stock).",
                                     "Error",
                                     JOptionPane.ERROR_MESSAGE
                             );
@@ -355,7 +362,6 @@ public class StoreWindow extends JFrame {
                             JOptionPane.ERROR_MESSAGE
                     )
             );
-
         });
 
         refreshFiltersAfterCatalogChange();
@@ -419,7 +425,7 @@ public class StoreWindow extends JFrame {
 
         Object selected = categoryCombo.getSelectedItem();
 
-        List<Product> all = controller.getAvailableProducts();
+        List<Product> all = controller.getAllProducts();
         java.util.List<Product> filtered = new java.util.ArrayList<>();
 
         for (Product p : all) {
@@ -446,7 +452,7 @@ public class StoreWindow extends JFrame {
      * Refreshes category options and applies the current filters.
      */
     private void refreshFiltersAfterCatalogChange() {
-        rebuildCategoryCombo(controller.getAvailableProducts());
+        rebuildCategoryCombo(controller.getAllProducts());
         applyFilters();
     }
 
@@ -461,5 +467,4 @@ public class StoreWindow extends JFrame {
             this.products = products;
         }
     }
-
 }

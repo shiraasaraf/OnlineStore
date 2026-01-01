@@ -9,6 +9,7 @@ import store.engine.StoreEngine;
 import store.gui.view.LauncherWindow;
 import store.io.ProductCatalogIO;
 import store.products.Product;
+import store.io.OrderHistoryIO;
 
 import javax.swing.*;
 import java.io.File;
@@ -52,8 +53,8 @@ public class Main {
                 }
             }
 
-            // BONUS: load existing orders history
-            engine.loadOrderHistoryFromFile();
+            //load existing orders history
+            engine.addLoadedOrders(OrderHistoryIO.loadOrders(engine));
 
             // Required in EX3: launcher stays open and can open multiple customer/admin windows
             LauncherWindow launcher = new LauncherWindow(engine);

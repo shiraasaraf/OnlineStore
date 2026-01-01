@@ -3,17 +3,13 @@
  * Tamar Nahum, ID 021983812
  * Shira Asaraf, ID 322218439
  */
-
 package store.engine;
 
 import store.cart.Cart;
-import store.cart.CartItem;
 import store.core.Customer;
 import store.order.Order;
 import store.products.Product;
 
-import java.io.*;
-import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -23,11 +19,13 @@ import java.util.List;
  * Manages products, customers and orders.
  * Implemented as a Singleton.
  * </p>
+ *
+ * <p>
+ * Note (MVC): This class does NOT handle file I/O. File operations are done in store.io classes.
+ * Thread-safety is handled by the Controller by synchronizing on the shared engine instance.
+ * </p>
  */
 public class StoreEngine {
-
-    private static final Object ORDER_FILE_LOCK = new Object();
-
 
     /** Singleton instance. */
     private static StoreEngine instance = null;
@@ -43,9 +41,6 @@ public class StoreEngine {
 
     /** Order ID generator. */
     private static int nextOrderId = 0;
-
-    /** Default CSV file for order history. */
-    private static final String ORDER_HISTORY_FILE = "orders_history.csv";
 
     /**
      * Private constructor (Singleton).
@@ -72,13 +67,6 @@ public class StoreEngine {
     // Product Management
     // ------------------------------------------------------------------------
 
-    /**
-     * Adds a product to the store.
-     * If a product with the same name already exists,
-     * its stock is increased.
-     *
-     * @param p product to add
-     */
     public void addProduct(Product p) {
         if (p == null) return;
 
@@ -94,12 +82,7 @@ public class StoreEngine {
         }
     }
 
-    /**
-     * Returns all products that are currently in stock.
-     *
-     * @return list of available products
-     */
-    public synchronized List<Product> getAvailableProducts() {
+    public List<Product> getAvailableProducts() {
         List<Product> available = new ArrayList<>();
         for (Product p : products) {
             if (p.getStock() > 0) {
@@ -109,21 +92,10 @@ public class StoreEngine {
         return available;
     }
 
-    /**
-     * Returns all products in the store.
-     *
-     * @return list of all products
-     */
-    public synchronized List<Product> getAllProducts() {
+    public List<Product> getAllProducts() {
         return new ArrayList<>(products);
     }
 
-    /**
-     * Removes a product from the store.
-     *
-     * @param product product to remove
-     * @return true if removed, false otherwise
-     */
     public boolean removeProduct(Product product) {
         if (product == null) return false;
         return products.remove(product);
@@ -133,13 +105,6 @@ public class StoreEngine {
     // Customer Management
     // ------------------------------------------------------------------------
 
-    /**
-     * Registers a new customer.
-     * Usernames must be unique.
-     *
-     * @param c customer to register
-     * @return true if registration succeeded, false otherwise
-     */
     public boolean registerCustomer(Customer c) {
         if (c == null) return false;
 
@@ -157,18 +122,13 @@ public class StoreEngine {
     // Order Management
     // ------------------------------------------------------------------------
 
-    /**
-     * Returns all orders created in the system.
-     *
-     * @return list of all orders
-     */
-    public synchronized List<Order> getAllOrders() {
+    public List<Order> getAllOrders() {
         return new ArrayList<>(allOrders);
     }
 
     /**
      * Creates an order from the given cart.
-     * The cart is cleared after successful checkout.
+     * The cart is cleared after successful creation.
      *
      * @param cart shopping cart
      * @return created order, or null if failed
@@ -189,142 +149,31 @@ public class StoreEngine {
         allOrders.add(newOrder);
         cart.clear();
 
-        appendOrderToHistoryFile(newOrder);
-
         return newOrder;
     }
 
     /**
-     * Appends an order to the history file.
+     * Adds loaded orders into the engine (used on startup).
+     * Also updates the nextOrderId so new orders will get unique IDs.
      *
-     * @param order order to save
+     * @param orders orders loaded from file
      */
-    private void appendOrderToHistoryFile(Order order) {
-        if (order == null) return;
+    public void addLoadedOrders(List<Order> orders) {
+        if (orders == null || orders.isEmpty()) return;
 
-        synchronized (ORDER_FILE_LOCK) {
-            try (BufferedWriter writer =
-                         new BufferedWriter(new FileWriter(ORDER_HISTORY_FILE, true))) {
-
-                StringBuilder itemsSummary = new StringBuilder();
-                for (CartItem item : order.getItems()) {
-                    if (item.getProduct() == null) continue;
-
-                    itemsSummary.append(item.getProduct().getName())
-                            .append(" x")
-                            .append(item.getQuantity())
-                            .append(";");
-                }
-
-                String line = String.format(
-                        "%d,%.2f,%s,%s",
-                        order.getOrderID(),
-                        order.getTotalAmount(),
-                        order.getCreatedAt(),
-                        itemsSummary
-                );
-
-                writer.write(line);
-                writer.newLine();
-
-            } catch (IOException e) {
-                e.printStackTrace();
+        for (Order o : orders) {
+            if (o == null) continue;
+            allOrders.add(o);
+            if (o.getOrderID() > nextOrderId) {
+                nextOrderId = o.getOrderID();
             }
         }
-    }
-
-
-    /**
-     * Loads order history from file if it exists.
-     */
-    public void loadOrderHistoryFromFile() {
-        File file = new File(ORDER_HISTORY_FILE);
-        if (!file.exists() || !file.isFile()) {
-            return;
-        }
-
-        try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
-            String line;
-
-            while ((line = reader.readLine()) != null) {
-
-                String[] parts = line.split(",", 4);
-                if (parts.length < 4) continue;
-
-                int orderId;
-                double total;
-                try {
-                    orderId = Integer.parseInt(parts[0].trim());
-                    total = Double.parseDouble(parts[1].trim());
-                } catch (NumberFormatException ex) {
-                    continue;
-                }
-
-                LocalDateTime createdAt;
-                try {
-                    createdAt = LocalDateTime.parse(parts[2].trim());
-                } catch (Exception ex) {
-                    createdAt = LocalDateTime.now();
-                }
-
-                List<CartItem> items = parseItemsSummary(parts[3].trim());
-                Order order = new Order(orderId, items, total, createdAt);
-                allOrders.add(order);
-
-                if (orderId > nextOrderId) {
-                    nextOrderId = orderId;
-                }
-            }
-
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
-
-    /**
-     * Parses items summary string into cart items.
-     *
-     * @param summary items summary string
-     * @return list of cart items
-     */
-    private List<CartItem> parseItemsSummary(String summary) {
-        List<CartItem> result = new ArrayList<>();
-        if (summary == null || summary.isEmpty()) return result;
-
-        String[] tokens = summary.split(";");
-        for (String token : tokens) {
-            String t = token.trim();
-            if (t.isEmpty()) continue;
-
-            String[] parts = t.split(" x");
-            if (parts.length != 2) continue;
-
-            int qty;
-            try {
-                qty = Integer.parseInt(parts[1].trim());
-            } catch (NumberFormatException ex) {
-                continue;
-            }
-
-            Product p = findProductByName(parts[0].trim());
-            if (p != null) {
-                result.add(new CartItem(p, qty));
-            }
-        }
-
-        return result;
     }
 
     // ------------------------------------------------------------------------
     // Helpers
     // ------------------------------------------------------------------------
 
-    /**
-     * Finds a product by name (case-insensitive).
-     *
-     * @param name product name
-     * @return matching product or null
-     */
     private Product findProductByName(String name) {
         if (name == null) return null;
 
@@ -334,5 +183,16 @@ public class StoreEngine {
             }
         }
         return null;
+    }
+
+    /**
+     * Public product lookup by name.
+     * Used by IO utilities to resolve products when loading orders.
+     *
+     * @param name product name
+     * @return matching product or null
+     */
+    public Product findProductPublic(String name) {
+        return findProductByName(name);
     }
 }

@@ -2,4 +2,4 @@ name,price,stock,description,category,imagePath
 Laptop,3500,5,14 inch laptop,ELECTRONICS,images/electronics/laptop_silver.jpg
 Phone,2500,8,Android phone,ELECTRONICS,images/electronics/smartphone.jpg
 Harry Potter,80.70,12,A thriller fiction book for young adults,BOOKS,images/books/HarryPotter.jpg,J.K. Rolling,625
-T-Shirt,59,20,Cotton shirt,CLOTHING,images/clothing/tshirt_red.jpg
+T-Shirt,59,1,Cotton shirt,CLOTHING,images/clothing/tshirt_red.jpg

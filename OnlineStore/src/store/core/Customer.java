@@ -6,28 +6,29 @@
 
 package store.core;
 
-import store.cart.CartItem;
-import store.products.Product;
 import store.cart.Cart;
+import store.cart.CartItem;
 import store.order.Order;
-import store.engine.StoreEngine;
+import store.products.Product;
 
 import java.util.ArrayList;
 import java.util.List;
 
-
 /**
  * Represents a customer in the store system.
  * A customer has a shopping cart and a list of past orders.
- * The customer can add items to the cart, remove them, and complete purchases
- * through the StoreEngine.
+ * The customer can add items to the cart, remove them, and keep order history.
+ *
+ * <p>
+ * Note: The customer does NOT communicate directly with the StoreEngine.
+ * Order creation is handled by the Controller/Engine (MVC separation).
+ * </p>
  */
 public class Customer extends User {
 
-    //data members
-    private Cart cart;
-    private List<Order> orderHistory;
-
+    // Data members
+    private final Cart cart;
+    private final List<Order> orderHistory;
 
     /**
      * Constructs a new Customer with an empty cart and an empty order history.
@@ -37,10 +38,7 @@ public class Customer extends User {
      * @param email    the customer's email address
      */
     public Customer(String username, String email) {
-
         super(username, email);
-
-        // initialize an empty cart and empty order history
         this.cart = new Cart();
         this.orderHistory = new ArrayList<>();
     }
@@ -52,50 +50,57 @@ public class Customer extends User {
      *
      * @return the customer's cart
      */
-    public Cart getCart() { return cart; }
+    public Cart getCart() {
+        return cart;
+    }
 
-    public List<CartItem> getItems(){
+    /**
+     * Returns current cart items.
+     *
+     * @return list of cart items
+     */
+    public List<CartItem> getItems() {
         return cart.getItems();
     }
 
     /**
-     * Returns a copy of the customer's order history.
-     * The returned list is a new list instance to preserve encapsulation
-     * and prevent external modification of the internal list.
+     * Returns a copy of the customer's order history to preserve encapsulation.
      *
      * @return a copy of the order history list
      */
-    public List<Order> getOrderHistory() { return new ArrayList<>(orderHistory); }
+    public List<Order> getOrderHistory() {
+        return new ArrayList<>(orderHistory);
+    }
 
     // ------------------------------------------------------------------------------------
 
     /**
      * Adds a product to the customer's cart.
      * The method checks that the product is not null, the quantity is positive,
-     * and there is enough stock. The stock is not updated here — only when an
-     * order is actually created.
+     * and there is enough stock.
+     *
+     * <p>
+     * Note: Stock is NOT updated here — only when an order is actually created
+     * by the controller/engine.
+     * </p>
      *
      * @param p        the product to add
      * @param quantity the amount to add (must be greater than zero)
      * @return true if the product was added, false otherwise
      */
-    public boolean addToCart(Product p, int quantity){
+    public boolean addToCart(Product p, int quantity) {
 
-        // check if item is existed and its quantity is logical
-        if(p == null || quantity <= 0) {
+        if (p == null || quantity <= 0) {
             return false;
         }
 
         // check if there is enough stock – but do not change it yet
-        if(p.getStock() < quantity) {
+        if (p.getStock() < quantity) {
             return false;
         }
 
-        // delegate to the cart to actually store the product and quantity
-        // Assumes Cart has a method: boolean addItem(Product p, int quantity)
         return cart.addItem(p, quantity);
     }
-
 
     /**
      * Removes a product completely from the customer's cart.
@@ -104,53 +109,28 @@ public class Customer extends User {
      * @return true if the product was removed from the cart, false otherwise
      */
     public boolean removeFromCart(Product p) {
-
-        if(p == null){
+        if (p == null) {
             return false;
         }
-        // delegate to cart
         return cart.removeItem(p);
     }
 
-
     /**
-     * Performs checkout for the customer's cart using the given store engine.
-     * If the cart is empty, checkout cannot be completed.
-     * Otherwise, the StoreEngine creates an order from the cart.
-     * If the order is successfully created, it is added to the order history
-     * and the cart is cleared.
+     * Adds an order to the customer's order history.
+     * This is called by the controller after the engine successfully creates the order.
      *
-     * @param engine store engine to create the order with
-     * @return true if the checkout succeeded, false otherwise
+     * @param order the created order
+     * @return true if added, false otherwise
      */
-    public boolean checkout(StoreEngine engine){
-
-        if(engine == null){
+    public boolean addOrder(Order order) {
+        if (order == null) {
             return false;
         }
-
-        // if the cart is empty, there is nothing to checkout
-        if(cart.isEmpty()){
-            return false;
-        }
-
-        // Creating an order through the store engine
-        Order order = engine.createOrderFromCart(cart);
-
-        if(order == null) {
-            return false;
-        }
-
-        // Add to the orders history
         orderHistory.add(order);
-
-        // Clean the cart
-        cart.clear();
-
         return true;
     }
 
-    //-----------------------------------------------------------------------------------
+    // ------------------------------------------------------------------------------------
 
     /**
      * Returns a simple string representation of the customer, including
@@ -165,7 +145,5 @@ public class Customer extends User {
                 "Number of orders: " + orderHistory.size();
     }
 
-
-    //equals Implemented in parent class
-
+    // equals implemented in parent class
 }

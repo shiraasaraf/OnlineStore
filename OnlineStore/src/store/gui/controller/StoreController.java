@@ -11,6 +11,7 @@ import store.cart.CartItem;
 import store.core.Customer;
 import store.core.Manager;
 import store.engine.StoreEngine;
+import store.io.OrderHistoryIO;
 import store.io.ProductCatalogIO;
 import store.order.Order;
 import store.products.Product;
@@ -24,13 +25,25 @@ import java.util.List;
  * Controller for the store GUI.
  * <p>
  * Bridges between the view layer and the model (engine/customer/manager).
- * Thread-safety is handled here by synchronizing critical operations on the shared engine.
+ * </p>
+ *
+ * <p>
+ * MVC note:
+ * - The Controller performs the "business flow" of checkout.
+ * - The Engine handles only data & logic (no file I/O).
+ * - File I/O is delegated to store.io classes.
+ * </p>
+ *
+ * <p>
+ * Thread-safety note:
+ * - Critical operations on shared state are synchronized on the shared engine instance.
+ * - File operations are synchronized inside the IO classes.
  * </p>
  */
 public class StoreController {
 
     /**
-     * Lock for file operations (prevents parallel load/save to the same file).
+     * Lock for product catalog file operations (prevents parallel load/save).
      */
     private static final Object PRODUCT_FILE_LOCK = new Object();
 
@@ -151,9 +164,29 @@ public class StoreController {
     }
 
     /**
+     * Returns the current customer's order history.
+     *
+     * @return list of customer's orders
+     */
+    public List<Order> getCustomerOrders() {
+        synchronized (engine) {
+            return customer.getOrderHistory();
+        }
+    }
+
+    /**
      * Performs checkout for the current customer.
      * This method is synchronized on the shared engine to keep:
      * stock validation + stock decrease + order creation atomic.
+     *
+     * <p>
+     * MVC-perfect flow:
+     * 1) validate stock
+     * 2) decrease stock (with rollback)
+     * 3) engine creates the order from cart (also clears cart + adds to engine orders)
+     * 4) customer adds the order to its personal history
+     * 5) save order history using OrderHistoryIO
+     * </p>
      *
      * @return true if checkout succeeded, false otherwise
      */
@@ -201,29 +234,32 @@ public class StoreController {
                 decreased.add(item);
             }
 
-            // 3) Create order through engine + clear cart inside customer
-            boolean ok = customer.checkout(engine);
-
-            if (!ok) {
-                // rollback if checkout failed
+            // 3) Create order in engine (engine adds it to allOrders and clears cart)
+            Order order = engine.createOrderFromCart(cart);
+            if (order == null) {
+                // rollback stock if engine failed to create order
                 for (CartItem item : decreased) {
                     Product p = item.getProduct();
                     p.increaseStock(item.getQuantity());
                 }
+                return false;
             }
 
-            return ok;
-        }
-    }
+            // 4) Add to customer's personal history
+            boolean added = customer.addOrder(order);
+            if (!added) {
+                // rollback stock to keep consistency
+                for (CartItem item : decreased) {
+                    Product p = item.getProduct();
+                    p.increaseStock(item.getQuantity());
+                }
+                return false;
+            }
 
-    /**
-     * Returns the current customer's order history.
-     *
-     * @return list of customer's orders
-     */
-    public List<Order> getCustomerOrders() {
-        synchronized (engine) {
-            return customer.getOrderHistory();
+            // 5) Save order to file (IO is centralized and synchronized in OrderHistoryIO)
+            OrderHistoryIO.appendOrder(order);
+
+            return true;
         }
     }
 
