@@ -15,7 +15,6 @@ import store.gui.util.WindowWorker;
 
 import javax.swing.*;
 import java.awt.*;
-
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 
@@ -29,12 +28,19 @@ import java.util.List;
  * Main store window.
  * <p>
  * Displays the product catalog grid, product details panel, and shopping cart panel.
- * Includes search and category filtering, and provides manager actions (load/save/manage catalog).
+ * Includes search and category filtering.
  * </p>
  *
  * <p>
- * This version shows ALL products in the catalog (including stock = 0).
- * Products that are out of stock remain visible (UX-friendly).
+ * UI rule:
+ * - Filters (Search + Category) are always visible for both Customer and Manager.
+ * - Actions buttons are role-based: Customer sees only customer actions;
+ *   Manager sees manager actions.
+ * </p>
+ *
+ * <p>
+ * Catalog rule:
+ * - Shows ALL products (including stock = 0).
  * </p>
  */
 public class StoreWindow extends JFrame {
@@ -53,17 +59,11 @@ public class StoreWindow extends JFrame {
     /** Shopping cart panel. */
     private final CartPanel cartPanel;
 
-    /** Button for loading products (manager only). */
-    private final JButton loadButton;
-
-    /** Button for saving products (manager only). */
-    private final JButton saveButton;
-
-    /** Button for opening catalog management (manager only). */
-    private final JButton manageCatalogButton;
-
-    /** Button for opening order history. */
-    private final JButton historyButton;
+    // --- Actions buttons (some appear only for manager UI) ---
+    private final JButton loadButton = new JButton("Load");
+    private final JButton saveButton = new JButton("Save");
+    private final JButton manageCatalogButton = new JButton("Manage Catalog");
+    private final JButton historyButton = new JButton("Order History");
 
     /** Search field. */
     private final JTextField searchField = new JTextField(18);
@@ -98,30 +98,109 @@ public class StoreWindow extends JFrame {
             }
         });
 
-        setTitle("Online Store");
+        setTitle("Online Store (" + roleName + ")");
         setSize(1000, 650);
         setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
         setExtendedState(JFrame.MAXIMIZED_BOTH);
         setLayout(new BorderLayout(10, 10));
 
-        // Top bar: title + buttons
-        JPanel topBar = new JPanel(new BorderLayout());
+        // NORTH: Title + Filters (always) + Actions (role-based)
+        JPanel topBar = new JPanel(new BorderLayout(10, 0));
         topBar.add(new JLabel("Product Catalog"), BorderLayout.WEST);
 
-        JPanel ioButtons = new JPanel(new FlowLayout(FlowLayout.RIGHT));
-        loadButton = new JButton("Loading products from a file");
-        saveButton = new JButton("Saving products to a file");
-        manageCatalogButton = new JButton("Manage catalog");
-        historyButton = new JButton("Order History");
+        topBar.add(buildFiltersPanel(), BorderLayout.CENTER);
+        topBar.add(buildActionsPanel(), BorderLayout.EAST);
 
-        boolean isManager = controller.canManage();
-        manageCatalogButton.setEnabled(isManager);
-        loadButton.setEnabled(isManager);
-        saveButton.setEnabled(isManager);
+        add(topBar, BorderLayout.NORTH);
 
-        historyButton.setEnabled(true);
+        // CENTER: Catalog
+        catalogPanel = new JPanel(new GridLayout(0, 3, 10, 10));
+        add(new JScrollPane(catalogPanel), BorderLayout.CENTER);
 
-        // Load products
+        // EAST: Details + Cart
+        JPanel rightPanel = new JPanel();
+        rightPanel.setLayout(new BoxLayout(rightPanel, BoxLayout.Y_AXIS));
+
+        detailsPanel = new ProductDetailsPanel(null);
+        cartPanel = new CartPanel();
+
+        rightPanel.add(detailsPanel);
+        rightPanel.add(Box.createVerticalStrut(10));
+        rightPanel.add(cartPanel);
+
+        add(rightPanel, BorderLayout.EAST);
+
+        // Wire listeners (same logic you had, only adjusted to getAllProducts())
+        wireActions();
+        wireCartAndDetails();
+
+        // Initial load / filters
+        refreshFiltersAfterCatalogChange();
+    }
+
+    // -------------------------------------------------------------------------
+    // UI Builders
+    // -------------------------------------------------------------------------
+
+    /** Builds the filters panel (always visible). */
+    private JPanel buildFiltersPanel() {
+        JPanel filtersBar = new JPanel(new FlowLayout(FlowLayout.LEFT));
+
+        filtersBar.add(new JLabel("Search:"));
+        filtersBar.add(searchField);
+        filtersBar.add(clearSearchButton);
+
+        filtersBar.add(Box.createHorizontalStrut(15));
+        filtersBar.add(new JLabel("Category:"));
+        filtersBar.add(categoryCombo);
+
+        // Live search
+        searchField.getDocument().addDocumentListener(new javax.swing.event.DocumentListener() {
+            private void apply() { applyFilters(); }
+            @Override public void insertUpdate(javax.swing.event.DocumentEvent e) { apply(); }
+            @Override public void removeUpdate(javax.swing.event.DocumentEvent e) { apply(); }
+            @Override public void changedUpdate(javax.swing.event.DocumentEvent e) { apply(); }
+        });
+
+        clearSearchButton.addActionListener(e -> {
+            searchField.setText("");
+            categoryCombo.setSelectedIndex(0);
+            applyFilters();
+        });
+
+        categoryCombo.addActionListener(e -> applyFilters());
+
+        return filtersBar;
+    }
+
+    /** Builds the actions panel based on role. */
+    private JPanel buildActionsPanel() {
+        return controller.canManage()
+                ? buildManagerActionsPanel()
+                : buildCustomerActionsPanel();
+    }
+
+    private JPanel buildCustomerActionsPanel() {
+        JPanel p = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        p.add(historyButton);
+        return p;
+    }
+
+    private JPanel buildManagerActionsPanel() {
+        JPanel p = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        p.add(loadButton);
+        p.add(saveButton);
+        p.add(manageCatalogButton);
+        p.add(historyButton);
+        return p;
+    }
+
+    // -------------------------------------------------------------------------
+    // Wiring
+    // -------------------------------------------------------------------------
+
+    private void wireActions() {
+        // Load products (manager only button exists only in manager UI)
         loadButton.addActionListener(e -> {
             JFileChooser chooser = new JFileChooser();
             int result = chooser.showOpenDialog(this);
@@ -140,7 +219,7 @@ public class StoreWindow extends JFrame {
                     },
                     products -> {
                         setCatalogProducts(products);
-                        rebuildCategoryCombo(controller.getAllProducts());
+                        refreshFiltersAfterCatalogChange();
                         JOptionPane.showMessageDialog(
                                 this,
                                 "Products loaded successfully.",
@@ -157,7 +236,7 @@ public class StoreWindow extends JFrame {
             );
         });
 
-        // Save products
+        // Save products (manager only)
         saveButton.addActionListener(e -> {
             JFileChooser chooser = new JFileChooser();
             int result = chooser.showSaveDialog(this);
@@ -188,68 +267,23 @@ public class StoreWindow extends JFrame {
             );
         });
 
-        // Manage catalog
+        // Manage catalog (manager only)
         manageCatalogButton.addActionListener(e -> {
             CatalogManagementWindow dialog = new CatalogManagementWindow(this, controller);
             dialog.setVisible(true);
+
             setCatalogProducts(controller.getAllProducts());
             refreshFiltersAfterCatalogChange();
         });
 
-        // Order history
+        // Order history (both)
         historyButton.addActionListener(e -> {
             OrderHistoryWindow dialog = new OrderHistoryWindow(this, controller);
             dialog.setVisible(true);
         });
+    }
 
-        ioButtons.add(loadButton);
-        ioButtons.add(saveButton);
-        ioButtons.add(manageCatalogButton);
-        ioButtons.add(historyButton);
-
-        topBar.add(ioButtons, BorderLayout.EAST);
-
-        // Search + Category Filter bar
-        JPanel filtersBar = new JPanel(new FlowLayout(FlowLayout.LEFT));
-
-        filtersBar.add(new JLabel("Search:"));
-        filtersBar.add(searchField);
-        filtersBar.add(clearSearchButton);
-
-        filtersBar.add(Box.createHorizontalStrut(15));
-        filtersBar.add(new JLabel("Category:"));
-        filtersBar.add(categoryCombo);
-
-        topBar.add(filtersBar, BorderLayout.CENTER);
-
-        searchField.getDocument().addDocumentListener(new javax.swing.event.DocumentListener() {
-            private void apply() { applyFilters(); }
-            @Override public void insertUpdate(javax.swing.event.DocumentEvent e) { apply(); }
-            @Override public void removeUpdate(javax.swing.event.DocumentEvent e) { apply(); }
-            @Override public void changedUpdate(javax.swing.event.DocumentEvent e) { apply(); }
-        });
-
-        clearSearchButton.addActionListener(e -> {
-            searchField.setText("");
-            categoryCombo.setSelectedIndex(0);
-            applyFilters();
-        });
-
-        categoryCombo.addActionListener(e -> applyFilters());
-
-        add(topBar, BorderLayout.NORTH);
-
-        // Catalog Center
-        catalogPanel = new JPanel(new GridLayout(0, 3, 10, 10));
-        add(new JScrollPane(catalogPanel), BorderLayout.CENTER);
-
-        // Right side: details + cart
-        JPanel rightPanel = new JPanel();
-        rightPanel.setLayout(new BoxLayout(rightPanel, BoxLayout.Y_AXIS));
-
-        detailsPanel = new ProductDetailsPanel(null);
-        cartPanel = new CartPanel();
-
+    private void wireCartAndDetails() {
         cartPanel.addRemoveItemListener(ev -> {
             JButton btn = (JButton) ev.getSource();
             Product p = (Product) btn.getClientProperty("product");
@@ -274,7 +308,7 @@ public class StoreWindow extends JFrame {
                         cartPanel.setItems(snapshot.items);
                         setCatalogProducts(snapshot.products);
                         detailsPanel.setProduct(detailsPanel.getProduct());
-                        applyFilters(); // keep current filters applied
+                        applyFilters();
                     },
                     ex -> JOptionPane.showMessageDialog(
                             this,
@@ -295,7 +329,7 @@ public class StoreWindow extends JFrame {
                         cartPanel.setItems(snapshot.items);
                         setCatalogProducts(snapshot.products);
                         detailsPanel.setProduct(detailsPanel.getProduct());
-                        applyFilters(); // re-apply filters after stock changed
+                        applyFilters();
 
                         if (snapshot.success) {
                             JOptionPane.showMessageDialog(
@@ -322,12 +356,6 @@ public class StoreWindow extends JFrame {
             );
         });
 
-        rightPanel.add(detailsPanel);
-        rightPanel.add(Box.createVerticalStrut(10));
-        rightPanel.add(cartPanel);
-
-        add(rightPanel, BorderLayout.EAST);
-
         detailsPanel.addAddToCartListener(e -> {
             Product p = detailsPanel.getProduct();
             if (p == null) return;
@@ -342,7 +370,7 @@ public class StoreWindow extends JFrame {
                         cartPanel.setItems(snapshot.items);
                         setCatalogProducts(snapshot.products);
                         detailsPanel.setProduct(p);
-                        applyFilters(); // keep current filters applied
+                        applyFilters();
 
                         if (snapshot.success) {
                             detailsPanel.showAddedFeedback();
@@ -363,9 +391,11 @@ public class StoreWindow extends JFrame {
                     )
             );
         });
-
-        refreshFiltersAfterCatalogChange();
     }
+
+    // -------------------------------------------------------------------------
+    // Catalog + Filters
+    // -------------------------------------------------------------------------
 
     /**
      * Sets the catalog products and rebuilds the grid UI.
@@ -455,6 +485,10 @@ public class StoreWindow extends JFrame {
         rebuildCategoryCombo(controller.getAllProducts());
         applyFilters();
     }
+
+    // -------------------------------------------------------------------------
+    // UiSnapshot
+    // -------------------------------------------------------------------------
 
     private static final class UiSnapshot {
         private final boolean success;
