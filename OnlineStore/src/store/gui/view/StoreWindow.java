@@ -27,7 +27,7 @@ import java.util.List;
 /**
  * Main store window.
  * <p>
- * Displays the product catalog grid, product details panel, and shopping cart panel.
+ * Displays the product catalog grid.
  * Includes search and category filtering.
  * </p>
  *
@@ -36,6 +36,7 @@ import java.util.List;
  * - Filters (Search + Category) are always visible for both Customer and Manager.
  * - Actions buttons are role-based: Customer sees only customer actions;
  *   Manager sees manager actions.
+ * - RIGHT PANEL (Product Details + Cart) exists ONLY for Customer.
  * </p>
  *
  * <p>
@@ -53,11 +54,11 @@ public class StoreWindow extends JFrame {
     /** Controller used to access model operations. */
     private final StoreController controller;
 
-    /** Panel that displays selected product details. */
-    private final ProductDetailsPanel detailsPanel;
+    /** Panel that displays selected product details (customer only). */
+    private ProductDetailsPanel detailsPanel; // null for manager
 
-    /** Shopping cart panel. */
-    private final CartPanel cartPanel;
+    /** Shopping cart panel (customer only). */
+    private CartPanel cartPanel; // null for manager
 
     // --- Actions buttons (some appear only for manager UI) ---
     private final JButton loadButton = new JButton("Load");
@@ -104,11 +105,24 @@ public class StoreWindow extends JFrame {
         setExtendedState(JFrame.MAXIMIZED_BOTH);
         setLayout(new BorderLayout(10, 10));
 
-        // NORTH: Title + Filters (always) + Actions (role-based)
-        JPanel topBar = new JPanel(new BorderLayout(10, 0));
-        topBar.add(new JLabel("Product Catalog"), BorderLayout.WEST);
+        // NORTH: Title (centered) + Filters (below title) + Actions (right)
+        JPanel topBar = new JPanel(new BorderLayout(10, 10));
 
-        topBar.add(buildFiltersPanel(), BorderLayout.CENTER);
+        JPanel centerBlock = new JPanel();
+        centerBlock.setLayout(new BoxLayout(centerBlock, BoxLayout.Y_AXIS));
+
+        JLabel titleLabel = new JLabel("Products Catalog", SwingConstants.CENTER);
+        titleLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+        titleLabel.setFont(new Font("SansSerif", Font.BOLD, 22));
+
+        centerBlock.add(titleLabel);
+        centerBlock.add(Box.createVerticalStrut(8));
+
+        JPanel filtersPanel = buildFiltersPanel();
+        filtersPanel.setAlignmentX(Component.CENTER_ALIGNMENT);
+        centerBlock.add(filtersPanel);
+
+        topBar.add(centerBlock, BorderLayout.CENTER);
         topBar.add(buildActionsPanel(), BorderLayout.EAST);
 
         add(topBar, BorderLayout.NORTH);
@@ -117,25 +131,35 @@ public class StoreWindow extends JFrame {
         catalogPanel = new JPanel(new GridLayout(0, 3, 10, 10));
         add(new JScrollPane(catalogPanel), BorderLayout.CENTER);
 
-        // EAST: Details + Cart
-        JPanel rightPanel = new JPanel();
-        rightPanel.setLayout(new BoxLayout(rightPanel, BoxLayout.Y_AXIS));
+        // EAST: Details + Cart (CUSTOMER ONLY)
+        if (!controller.canManage()) {
+            JPanel rightPanel = new JPanel();
+            rightPanel.setLayout(new BoxLayout(rightPanel, BoxLayout.Y_AXIS));
 
-        detailsPanel = new ProductDetailsPanel(null);
-        cartPanel = new CartPanel();
+            detailsPanel = new ProductDetailsPanel(null);
+            cartPanel = new CartPanel();
 
-        rightPanel.add(detailsPanel);
-        rightPanel.add(Box.createVerticalStrut(10));
-        rightPanel.add(cartPanel);
+            rightPanel.add(detailsPanel);
+            rightPanel.add(Box.createVerticalStrut(10));
+            rightPanel.add(cartPanel);
 
-        add(rightPanel, BorderLayout.EAST);
+            add(rightPanel, BorderLayout.EAST);
+        } else {
+            // manager: no right panel
+            detailsPanel = null;
+            cartPanel = null;
+        }
 
-        // Wire listeners (same logic you had, only adjusted to getAllProducts())
+        // Wire actions (always)
         wireActions();
-        wireCartAndDetails();
+
+        // Wire customer-only cart/details listeners
+        if (!controller.canManage()) {
+            wireCartAndDetails();
+        }
 
         // Initial load / filters
-        refreshFiltersAfterCatalogChange();
+        refreshCatalogView();
     }
 
     // -------------------------------------------------------------------------
@@ -144,7 +168,7 @@ public class StoreWindow extends JFrame {
 
     /** Builds the filters panel (always visible). */
     private JPanel buildFiltersPanel() {
-        JPanel filtersBar = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        JPanel filtersBar = new JPanel(new FlowLayout(FlowLayout.CENTER));
 
         filtersBar.add(new JLabel("Search:"));
         filtersBar.add(searchField);
@@ -200,6 +224,7 @@ public class StoreWindow extends JFrame {
     // -------------------------------------------------------------------------
 
     private void wireActions() {
+
         // Load products (manager only button exists only in manager UI)
         loadButton.addActionListener(e -> {
             JFileChooser chooser = new JFileChooser();
@@ -212,14 +237,13 @@ public class StoreWindow extends JFrame {
                     () -> {
                         try {
                             controller.loadProductsFromFile(selectedFile);
-                            return controller.getAllProducts();
+                            return null;
                         } catch (IOException ex) {
                             throw new RuntimeException("Failed to load products from file", ex);
                         }
                     },
-                    products -> {
-                        setCatalogProducts(products);
-                        refreshFiltersAfterCatalogChange();
+                    ignored -> {
+                        refreshCatalogView();
                         JOptionPane.showMessageDialog(
                                 this,
                                 "Products loaded successfully.",
@@ -248,11 +272,12 @@ public class StoreWindow extends JFrame {
                     () -> {
                         try {
                             controller.saveProductsToFile(selectedFile);
+                            return null;
                         } catch (IOException ex) {
                             throw new RuntimeException("Failed to save products to file", ex);
                         }
                     },
-                    () -> JOptionPane.showMessageDialog(
+                    ignored -> JOptionPane.showMessageDialog(
                             this,
                             "Products saved successfully.",
                             "Success",
@@ -271,9 +296,7 @@ public class StoreWindow extends JFrame {
         manageCatalogButton.addActionListener(e -> {
             CatalogManagementWindow dialog = new CatalogManagementWindow(this, controller);
             dialog.setVisible(true);
-
-            setCatalogProducts(controller.getAllProducts());
-            refreshFiltersAfterCatalogChange();
+            refreshCatalogView();
         });
 
         // Order history (both)
@@ -284,6 +307,8 @@ public class StoreWindow extends JFrame {
     }
 
     private void wireCartAndDetails() {
+        if (cartPanel == null || detailsPanel == null) return;
+
         cartPanel.addRemoveItemListener(ev -> {
             JButton btn = (JButton) ev.getSource();
             Product p = (Product) btn.getClientProperty("product");
@@ -411,7 +436,9 @@ public class StoreWindow extends JFrame {
             panel.addMouseListener(new MouseAdapter() {
                 @Override
                 public void mouseClicked(MouseEvent e) {
-                    detailsPanel.setProduct(p);
+                    if (detailsPanel != null) { // customer only
+                        detailsPanel.setProduct(p);
+                    }
                 }
             });
 
@@ -480,10 +507,19 @@ public class StoreWindow extends JFrame {
 
     /**
      * Refreshes category options and applies the current filters.
+     * Internal implementation detail (kept private for encapsulation).
      */
     private void refreshFiltersAfterCatalogChange() {
         rebuildCategoryCombo(controller.getAllProducts());
         applyFilters();
+    }
+
+    /**
+     * Public "Facade" method: refresh catalog view safely.
+     * Other windows should call this instead of touching internal filter logic.
+     */
+    public void refreshCatalogView() {
+        refreshFiltersAfterCatalogChange();
     }
 
     // -------------------------------------------------------------------------

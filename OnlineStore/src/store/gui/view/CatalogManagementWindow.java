@@ -166,8 +166,8 @@ public class CatalogManagementWindow extends JDialog {
 
     private void refreshEverywhere() {
         refreshProductList();
-        // חשוב: לא getAvailableProducts() כדי שלא יעלמו מוצרים עם 0 מלאי
-        parentWindow.setCatalogProducts(controller.getAllProducts());
+        // refresh via public facade (encapsulation-safe)
+        parentWindow.refreshCatalogView();
     }
 
     private void onRemoveClicked(ActionEvent e) {

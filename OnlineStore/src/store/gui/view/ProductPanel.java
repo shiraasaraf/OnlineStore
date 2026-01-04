@@ -43,11 +43,16 @@ public class ProductPanel extends JPanel {
     /** Fixed card size. */
     private static final int CARD_H = 220;
 
-    /** Image display width. */
+    /** Image area target size (like your old sizes). */
     private static final int IMG_W = 169;
-
-    /** Image display height. */
     private static final int IMG_H = 219;
+
+    /** Padding between image and the white frame. */
+    private static final int IMG_PAD = 8;
+
+    /** Keep icon scaled to these inner bounds. */
+    private int lastScaledW = -1;
+    private int lastScaledH = -1;
 
     /**
      * Constructs a new product panel for the given product.
@@ -63,17 +68,45 @@ public class ProductPanel extends JPanel {
         setBackground(Color.WHITE);
         setOpaque(true);
 
-        // Center: image with optional "OUT OF STOCK" badge on top
-        JPanel imageContainer = new JPanel(null);
-        imageContainer.setBackground(Color.WHITE);
-        imageContainer.setOpaque(true);
-        imageContainer.setPreferredSize(new Dimension(IMG_W, IMG_H));
+        //hand cursor when hovering over the product card
+        setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+
+
+        // ---- Image area (centered properly even when panel is wider) ----
+        JLayeredPane imageLayer = new JLayeredPane() {
+            @Override
+            public void doLayout() {
+                int w = getWidth();
+                int h = getHeight();
+
+                // inner image box size (fixed, so it always looks consistent)
+                int innerW = Math.max(1, IMG_W - 2 * IMG_PAD);
+                int innerH = Math.max(1, IMG_H - 2 * IMG_PAD);
+
+                // center the image box inside available space
+                int x = (w - innerW) / 2;
+                int y = (h - innerH) / 2;
+
+                imageLabel.setBounds(x, y, innerW, innerH);
+
+                // badge top-right (relative to the whole imageLayer)
+                Dimension pref = outOfStockBadge.getPreferredSize();
+                int bx = w - pref.width - 6;
+                int by = 6;
+                outOfStockBadge.setBounds(bx, by, pref.width, pref.height);
+
+                // re-scale icon only if size changed
+                maybeRescaleIcon(innerW, innerH);
+            }
+        };
+        imageLayer.setOpaque(true);
+        imageLayer.setBackground(Color.WHITE);
+        imageLayer.setPreferredSize(new Dimension(IMG_W, IMG_H));
 
         imageLabel.setHorizontalAlignment(SwingConstants.CENTER);
         imageLabel.setVerticalAlignment(SwingConstants.CENTER);
         imageLabel.setOpaque(true);
         imageLabel.setBackground(Color.WHITE);
-        imageLabel.setBounds(0, 0, IMG_W, IMG_H);
 
         // Badge styling
         outOfStockBadge.setOpaque(true);
@@ -83,12 +116,12 @@ public class ProductPanel extends JPanel {
         outOfStockBadge.setBorder(BorderFactory.createEmptyBorder(3, 6, 3, 6));
         outOfStockBadge.setVisible(false);
 
-        // Add to container (badge on top of image)
-        imageContainer.add(imageLabel);
-        imageContainer.add(outOfStockBadge);
+        imageLayer.add(imageLabel, JLayeredPane.DEFAULT_LAYER);
+        imageLayer.add(outOfStockBadge, JLayeredPane.PALETTE_LAYER);
 
-        add(imageContainer, BorderLayout.CENTER);
+        add(imageLayer, BorderLayout.CENTER);
 
+        // ---- Bottom info ----
         nameLabel = new JLabel(product.getDisplayName(), SwingConstants.CENTER);
         priceLabel = new JLabel("$" + product.getPrice(), SwingConstants.CENTER);
 
@@ -107,70 +140,59 @@ public class ProductPanel extends JPanel {
 
         add(infoPanel, BorderLayout.SOUTH);
 
-        // Load image
+        // Load image (icon will be scaled on first doLayout)
         loadImage();
 
-        // Apply stock UI (badge + dim price)
-        applyStockUi(imageContainer);
+        // Stock UI (badge + dim price)
+        applyStockUi();
 
         // Tooltip
         setToolTipText(buildTooltip());
     }
 
-    /**
-     * Returns the product displayed by this panel.
-     *
-     * @return the product
-     */
     public Product getProduct() {
         return product;
     }
 
-    /**
-     * Applies visual UI changes based on stock.
-     */
-    private void applyStockUi(JPanel imageContainer) {
+    private void applyStockUi() {
         boolean outOfStock = (product != null && product.getStock() <= 0);
-
-        // Show badge if out of stock
         outOfStockBadge.setVisible(outOfStock);
-
-        // Position badge (top-right)
-        if (outOfStock) {
-            Dimension pref = outOfStockBadge.getPreferredSize();
-            int x = IMG_W - pref.width - 6;
-            int y = 6;
-            outOfStockBadge.setBounds(x, y, pref.width, pref.height);
-
-            // Dim price text
-            priceLabel.setForeground(Color.GRAY);
-        } else {
-            priceLabel.setForeground(Color.BLACK);
-        }
-
-        imageContainer.revalidate();
-        imageContainer.repaint();
+        priceLabel.setForeground(outOfStock ? Color.GRAY : Color.BLACK);
     }
 
-    /**
-     * Builds a nicer tooltip including stock status.
-     */
     private String buildTooltip() {
         if (product == null) return "No product";
-        String stockText = (product.getStock() <= 0) ? "Out of stock" : ("In stock: " + product.getStock());
+
+        String stockText = (product.getStock() <= 0)
+                ? "Out of stock"
+                : ("In stock: " + product.getStock());
+
+        String desc = product.getDescription();
+        if (desc == null) desc = "";
+        desc = desc.trim();
+        if (desc.isEmpty()) desc = "-";
+
+        // כדי שהטקסט לא יהיה ענק אם יש תיאור ארוך:
+        int maxLen = 160;
+        if (desc.length() > maxLen) {
+            desc = desc.substring(0, maxLen) + "...";
+        }
+
         return "<html>"
                 + "<b>" + safe(product.getDisplayName()) + "</b><br>"
                 + "Price: $" + product.getPrice() + "<br>"
-                + stockText
+                + stockText + "<br>"
+                + "<b>Description:</b> " + safe(desc)
                 + "</html>";
     }
+
 
     private String safe(String s) {
         return (s == null) ? "" : s.replace("<", "&lt;").replace(">", "&gt;");
     }
 
     /**
-     * Loads and scales the product image into the image label.
+     * Loads the product image (unscaled). Scaling is done in doLayout().
      */
     private void loadImage() {
         try {
@@ -190,14 +212,34 @@ public class ProductPanel extends JPanel {
             }
 
             ImageIcon icon = new ImageIcon(url);
-            Image scaled = icon.getImage().getScaledInstance(IMG_W, IMG_H, Image.SCALE_SMOOTH);
-
             imageLabel.setText("");
-            imageLabel.setIcon(new ImageIcon(scaled));
+            imageLabel.setIcon(icon);
+
+            // reset scaling cache so it will rescale on first layout
+            lastScaledW = -1;
+            lastScaledH = -1;
 
         } catch (Exception e) {
             imageLabel.setIcon(null);
             imageLabel.setText("Image error");
         }
+    }
+
+    /**
+     * Scale icon only when needed (called from doLayout()).
+     */
+    private void maybeRescaleIcon(int targetW, int targetH) {
+        Icon ic = imageLabel.getIcon();
+        if (!(ic instanceof ImageIcon)) return;
+
+        if (targetW <= 0 || targetH <= 0) return;
+        if (targetW == lastScaledW && targetH == lastScaledH) return;
+
+        ImageIcon icon = (ImageIcon) ic;
+        Image scaled = icon.getImage().getScaledInstance(targetW, targetH, Image.SCALE_SMOOTH);
+        imageLabel.setIcon(new ImageIcon(scaled));
+
+        lastScaledW = targetW;
+        lastScaledH = targetH;
     }
 }
