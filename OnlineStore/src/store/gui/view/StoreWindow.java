@@ -64,7 +64,12 @@ public class StoreWindow extends JFrame {
     private final JButton loadButton = new JButton("Load");
     private final JButton saveButton = new JButton("Save");
     private final JButton manageCatalogButton = new JButton("Manage Catalog");
+
+    // History button text is role-based (set in constructor)
     private final JButton historyButton = new JButton("Order History");
+
+    // Keep a reference so we can refresh it (and avoid opening multiple dialogs)
+    private OrderHistoryWindow historyWindow;
 
     /** Search field. */
     private final JTextField searchField = new JTextField(18);
@@ -104,6 +109,9 @@ public class StoreWindow extends JFrame {
         setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
         setExtendedState(JFrame.MAXIMIZED_BOTH);
         setLayout(new BorderLayout(10, 10));
+
+        // Role-based label for history button
+        historyButton.setText(controller.canManage() ? "All Orders" : "My Orders");
 
         // NORTH: Title (centered) + Filters (below title) + Actions (right)
         JPanel topBar = new JPanel(new BorderLayout(10, 10));
@@ -299,11 +307,19 @@ public class StoreWindow extends JFrame {
             refreshCatalogView();
         });
 
-        // Order history (both)
-        historyButton.addActionListener(e -> {
-            OrderHistoryWindow dialog = new OrderHistoryWindow(this, controller);
-            dialog.setVisible(true);
-        });
+        // Order history (both) - role-based title + refresh + reuse window instance
+        historyButton.addActionListener(e -> openOrRefreshHistoryWindow());
+    }
+
+    private void openOrRefreshHistoryWindow() {
+        if (historyWindow == null || !historyWindow.isDisplayable()) {
+            historyWindow = new OrderHistoryWindow(this, controller);
+            historyWindow.setDefaultCloseOperation(JDialog.DISPOSE_ON_CLOSE);
+        }
+
+        historyWindow.setTitle(controller.canManage() ? "All Orders History" : "My Orders History");
+        historyWindow.refreshOrders();
+        historyWindow.setVisible(true);
     }
 
     private void wireCartAndDetails() {
@@ -363,6 +379,12 @@ public class StoreWindow extends JFrame {
                                     "Checkout",
                                     JOptionPane.INFORMATION_MESSAGE
                             );
+
+                            // If history window is open - refresh it automatically
+                            if (historyWindow != null && historyWindow.isDisplayable()) {
+                                historyWindow.refreshOrders();
+                            }
+
                         } else {
                             JOptionPane.showMessageDialog(
                                     this,

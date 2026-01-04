@@ -16,16 +16,18 @@ import store.products.Product;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ActionEvent;
+import java.io.File;
+import java.io.IOException;
 import java.util.List;
 
 /**
  * Dialog window for catalog / inventory management (Manager).
- * Allows:
- * - Removing a selected product
- * - Updating stock (increase/decrease)
- * - Adding a new product (Book/Clothing/Electronics based on Category)
+ * Supports: delete product, increase/decrease stock, add new product.
+ * After every successful change, the catalog is saved to a default CSV file.
  */
 public class CatalogManagementWindow extends JDialog {
+
+    private static final File DEFAULT_CATALOG_FILE = new File("products_catalog.csv");
 
     private final StoreController controller;
     private final StoreWindow parentWindow;
@@ -41,6 +43,12 @@ public class CatalogManagementWindow extends JDialog {
 
     private final JSpinner stockSpinner;
 
+    /**
+     * Constructs the catalog management dialog (manager-only).
+     *
+     * @param parentWindow parent store window
+     * @param controller   store controller
+     */
     public CatalogManagementWindow(StoreWindow parentWindow, StoreController controller) {
         super(parentWindow, "Catalog / Inventory Management", true);
 
@@ -62,7 +70,6 @@ public class CatalogManagementWindow extends JDialog {
         setLocationRelativeTo(parentWindow);
         setLayout(new BorderLayout(10, 10));
 
-        // List
         listModel = new DefaultListModel<>();
         productList = new JList<>(listModel);
         productList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
@@ -92,7 +99,6 @@ public class CatalogManagementWindow extends JDialog {
 
         add(new JScrollPane(productList), BorderLayout.CENTER);
 
-        // Right panel: stock controls + add product
         JPanel rightPanel = new JPanel();
         rightPanel.setLayout(new BoxLayout(rightPanel, BoxLayout.Y_AXIS));
         rightPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
@@ -117,7 +123,6 @@ public class CatalogManagementWindow extends JDialog {
 
         add(rightPanel, BorderLayout.EAST);
 
-        // Bottom buttons
         removeButton = new JButton("Delete selected product");
         closeButton = new JButton("Close");
 
@@ -166,8 +171,24 @@ public class CatalogManagementWindow extends JDialog {
 
     private void refreshEverywhere() {
         refreshProductList();
-        // refresh via public facade (encapsulation-safe)
         parentWindow.refreshCatalogView();
+    }
+
+    /**
+     * Saves the current catalog to the default CSV file.
+     * Shows an error dialog if saving fails.
+     */
+    private void saveCatalogToDefaultFile() {
+        try {
+            controller.saveProductsToFile(DEFAULT_CATALOG_FILE);
+        } catch (IOException ex) {
+            JOptionPane.showMessageDialog(
+                    this,
+                    "Catalog was updated, but saving to CSV failed:\n" + ex.getMessage(),
+                    "Save Error",
+                    JOptionPane.ERROR_MESSAGE
+            );
+        }
     }
 
     private void onRemoveClicked(ActionEvent e) {
@@ -188,6 +209,7 @@ public class CatalogManagementWindow extends JDialog {
             return;
         }
 
+        saveCatalogToDefaultFile();
         refreshEverywhere();
     }
 
@@ -202,6 +224,7 @@ public class CatalogManagementWindow extends JDialog {
             return;
         }
 
+        saveCatalogToDefaultFile();
         refreshEverywhere();
     }
 
@@ -221,6 +244,7 @@ public class CatalogManagementWindow extends JDialog {
             return;
         }
 
+        saveCatalogToDefaultFile();
         refreshEverywhere();
     }
 
@@ -234,12 +258,27 @@ public class CatalogManagementWindow extends JDialog {
             return;
         }
 
+        saveCatalogToDefaultFile();
         refreshEverywhere();
     }
 
     /**
      * Creates a concrete product instance based on the selected Category:
      * BOOKS -> BookProduct, CLOTHING -> ClothingProduct, ELECTRONICS -> ElectronicsProduct.
+     *
+     * @return created product or null if cancelled/invalid
+     */
+    /**
+     * Creates a concrete product instance based on the selected Category:
+     * BOOKS -> BookProduct, CLOTHING -> ClothingProduct, ELECTRONICS -> ElectronicsProduct.
+     *
+     * @return created product or null if cancelled/invalid
+     */
+    /**
+     * Creates a concrete product instance based on the selected Category:
+     * BOOKS -> BookProduct, CLOTHING -> ClothingProduct, ELECTRONICS -> ElectronicsProduct.
+     *
+     * @return created product or null if cancelled/invalid
      */
     private Product showAddProductDialog() {
 
@@ -247,12 +286,13 @@ public class CatalogManagementWindow extends JDialog {
         JTextField priceField = new JTextField(18);
         JTextField stockField = new JTextField(18);
         JComboBox<Category> categoryBox = new JComboBox<>(Category.values());
+
         JTextField imagePathField = new JTextField(18);
+
         JTextArea descArea = new JTextArea(4, 18);
         descArea.setLineWrap(true);
         descArea.setWrapStyleWord(true);
 
-        // Extra fields for specific product types
         JTextField authorField = new JTextField(18);
         JTextField pagesField = new JTextField(18);
 
@@ -261,7 +301,6 @@ public class CatalogManagementWindow extends JDialog {
         JTextField warrantyField = new JTextField(18);
         JTextField brandField = new JTextField(18);
 
-        // UI - enable fields based on category
         Runnable updateFields = () -> {
             Category c = (Category) categoryBox.getSelectedItem();
 
@@ -276,6 +315,18 @@ public class CatalogManagementWindow extends JDialog {
 
             warrantyField.setEnabled(isElec);
             brandField.setEnabled(isElec);
+
+            if (!isBook) {
+                authorField.setText("");
+                pagesField.setText("");
+            }
+            if (!isClothing) {
+                sizeField.setText("");
+            }
+            if (!isElec) {
+                warrantyField.setText("");
+                brandField.setText("");
+            }
         };
 
         categoryBox.addActionListener(ev -> updateFields.run());
@@ -289,74 +340,70 @@ public class CatalogManagementWindow extends JDialog {
         int row = 0;
 
         gc.gridx = 0; gc.gridy = row;
-        panel.add(new JLabel("Name:"), gc);
+        panel.add(new JLabel("Name:*"), gc);
         gc.gridx = 1;
         panel.add(nameField, gc);
 
         row++;
         gc.gridx = 0; gc.gridy = row;
-        panel.add(new JLabel("Price (>0):"), gc);
+        panel.add(new JLabel("Price (>0):*"), gc);
         gc.gridx = 1;
         panel.add(priceField, gc);
 
         row++;
         gc.gridx = 0; gc.gridy = row;
-        panel.add(new JLabel("Stock (>=0):"), gc);
+        panel.add(new JLabel("Stock (>=0):*"), gc);
         gc.gridx = 1;
         panel.add(stockField, gc);
 
         row++;
         gc.gridx = 0; gc.gridy = row;
-        panel.add(new JLabel("Category:"), gc);
+        panel.add(new JLabel("Category:*"), gc);
         gc.gridx = 1;
         panel.add(categoryBox, gc);
 
         row++;
         gc.gridx = 0; gc.gridy = row;
-        panel.add(new JLabel("Image path (resources):"), gc);
+        panel.add(new JLabel("Image path (resources/images):*"), gc);
         gc.gridx = 1;
         panel.add(imagePathField, gc);
 
         row++;
         gc.gridx = 0; gc.gridy = row;
-        panel.add(new JLabel("Description:"), gc);
+        panel.add(new JLabel("Description:*"), gc);
         gc.gridx = 1;
         panel.add(new JScrollPane(descArea), gc);
 
-        // Book fields
         row++;
         gc.gridx = 0; gc.gridy = row;
-        panel.add(new JLabel("Book: Author:"), gc);
+        panel.add(new JLabel("Book: Author:*"), gc);
         gc.gridx = 1;
         panel.add(authorField, gc);
 
         row++;
         gc.gridx = 0; gc.gridy = row;
-        panel.add(new JLabel("Book: Pages (>0):"), gc);
+        panel.add(new JLabel("Book: Pages (>0):*"), gc);
         gc.gridx = 1;
         panel.add(pagesField, gc);
 
-        // Clothing fields
         row++;
         gc.gridx = 0; gc.gridy = row;
-        panel.add(new JLabel("Clothing: Size:"), gc);
+        panel.add(new JLabel("Clothing: Size:*"), gc);
         gc.gridx = 1;
         panel.add(sizeField, gc);
 
-        // Electronics fields
         row++;
         gc.gridx = 0; gc.gridy = row;
-        panel.add(new JLabel("Electronics: Warranty Months (>0):"), gc);
+        panel.add(new JLabel("Electronics: Warranty Months (>0):*"), gc);
         gc.gridx = 1;
         panel.add(warrantyField, gc);
 
         row++;
         gc.gridx = 0; gc.gridy = row;
-        panel.add(new JLabel("Electronics: Brand:"), gc);
+        panel.add(new JLabel("Electronics: Brand:*"), gc);
         gc.gridx = 1;
         panel.add(brandField, gc);
 
-        // init enable/disable
         updateFields.run();
 
         int res = JOptionPane.showConfirmDialog(
@@ -368,7 +415,6 @@ public class CatalogManagementWindow extends JDialog {
         );
         if (res != JOptionPane.OK_OPTION) return null;
 
-        // Base fields
         String name = nameField.getText() == null ? "" : nameField.getText().trim();
         String priceText = priceField.getText() == null ? "" : priceField.getText().trim();
         String stockText = stockField.getText() == null ? "" : stockField.getText().trim();
@@ -382,6 +428,27 @@ public class CatalogManagementWindow extends JDialog {
         }
         if (cat == null) {
             JOptionPane.showMessageDialog(this, "Category is required.", "Validation", JOptionPane.WARNING_MESSAGE);
+            return null;
+        }
+        if (desc.isEmpty() || desc.length() < 3) {
+            JOptionPane.showMessageDialog(this, "Description is required.", "Validation", JOptionPane.WARNING_MESSAGE);
+            return null;
+        }
+
+        // Image path is mandatory
+        if (img.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Image path is required.", "Validation", JOptionPane.WARNING_MESSAGE);
+            return null;
+        }
+
+        // Enforce resources/images path format
+        if (!(img.startsWith("images/") || img.startsWith("images\\"))) {
+            JOptionPane.showMessageDialog(
+                    this,
+                    "Image path must be inside resources/images.\nExample: images/product.jpg",
+                    "Validation",
+                    JOptionPane.WARNING_MESSAGE
+            );
             return null;
         }
 
@@ -409,13 +476,16 @@ public class CatalogManagementWindow extends JDialog {
             return null;
         }
 
-        // Keep UI simple: fixed color
         Color color = Color.BLACK;
 
-        // Create the correct concrete product
         if (cat == Category.BOOKS) {
             String author = authorField.getText() == null ? "" : authorField.getText().trim();
             String pagesText = pagesField.getText() == null ? "" : pagesField.getText().trim();
+
+            if (author.isEmpty()) {
+                JOptionPane.showMessageDialog(this, "Author is required for books.", "Validation", JOptionPane.WARNING_MESSAGE);
+                return null;
+            }
 
             int pages;
             try {
@@ -434,12 +504,21 @@ public class CatalogManagementWindow extends JDialog {
 
         if (cat == Category.CLOTHING) {
             String size = sizeField.getText() == null ? "" : sizeField.getText().trim();
+            if (size.isEmpty()) {
+                JOptionPane.showMessageDialog(this, "Size is required for clothing.", "Validation", JOptionPane.WARNING_MESSAGE);
+                return null;
+            }
             return new ClothingProduct(name, price, stock, desc, cat, color, img, size);
         }
 
         // ELECTRONICS
         String warrantyText = warrantyField.getText() == null ? "" : warrantyField.getText().trim();
         String brand = brandField.getText() == null ? "" : brandField.getText().trim();
+
+        if (brand.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Brand is required for electronics.", "Validation", JOptionPane.WARNING_MESSAGE);
+            return null;
+        }
 
         int warrantyMonths;
         try {
@@ -455,4 +534,6 @@ public class CatalogManagementWindow extends JDialog {
 
         return new ElectronicsProduct(name, price, stock, desc, cat, color, img, warrantyMonths, brand);
     }
+
+
 }

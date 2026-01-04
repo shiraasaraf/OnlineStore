@@ -18,7 +18,8 @@ import java.util.List;
 /**
  * Dialog window that displays the order history in a table.
  * <p>
- * Orders are retrieved through {@link StoreController}.
+ * - Manager can see all orders of all customers.
+ * - Customer can see only their own orders.
  * </p>
  */
 public class OrderHistoryWindow extends JDialog {
@@ -49,14 +50,18 @@ public class OrderHistoryWindow extends JDialog {
 
         this.controller = controller;
 
-        setSize(800, 450);
+        setSize(900, 450);
         setLocationRelativeTo(parent);
         setLayout(new BorderLayout(10, 10));
 
-        tableModel = new DefaultTableModel(
-                new Object[]{"Order ID", "Total Amount", "Created At", "Items"},
-                0
-        ) {
+        boolean isManager = (controller != null && controller.canManage());
+
+        // Manager sees an extra column: Customer
+        Object[] columns = isManager
+                ? new Object[]{"Customer", "Order ID", "Total Amount", "Created At", "Items"}
+                : new Object[]{"Order ID", "Total Amount", "Created At", "Items"};
+
+        tableModel = new DefaultTableModel(columns, 0) {
             @Override
             public boolean isCellEditable(int row, int column) {
                 return false;
@@ -85,22 +90,42 @@ public class OrderHistoryWindow extends JDialog {
 
     /**
      * Reloads the table contents from the controller.
+     * Manager sees all orders; customer sees only their own orders.
      */
-    private void refreshOrders() {
+    public void refreshOrders() {
         tableModel.setRowCount(0);
 
-        List<Order> orders = controller.getAllOrders();
+        if (controller == null) return;
+
+        boolean isManager = controller.canManage();
+
+        List<Order> orders = isManager
+                ? controller.getAllOrders()
+                : controller.getCustomerOrders();
+
         if (orders == null || orders.isEmpty()) {
             return;
         }
 
         for (Order o : orders) {
-            tableModel.addRow(new Object[]{
-                    o.getOrderID(),
-                    String.format("%.2f", o.getTotalAmount()),
-                    o.getCreatedAt(),
-                    buildItemsSummary(o)
-            });
+            if (o == null) continue;
+
+            if (isManager) {
+                tableModel.addRow(new Object[]{
+                        o.getCustomerUsername(),
+                        o.getOrderID(),
+                        String.format("%.2f", o.getTotalAmount()),
+                        formatDateTime(o.getCreatedAt()),
+                        buildItemsSummary(o)
+                });
+            } else {
+                tableModel.addRow(new Object[]{
+                        o.getOrderID(),
+                        String.format("%.2f", o.getTotalAmount()),
+                        formatDateTime(o.getCreatedAt()),
+                        buildItemsSummary(o)
+                });
+            }
         }
     }
 
@@ -131,4 +156,12 @@ public class OrderHistoryWindow extends JDialog {
 
         return sb.toString();
     }
+
+    private String formatDateTime(java.time.LocalDateTime dt) {
+        if (dt == null) return "";
+        java.time.format.DateTimeFormatter f =
+                java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss");
+        return dt.format(f);
+    }
+
 }

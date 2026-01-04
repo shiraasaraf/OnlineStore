@@ -6,9 +6,9 @@
 package store.io;
 
 import store.cart.CartItem;
+import store.engine.StoreEngine;
 import store.order.Order;
 import store.products.Product;
-import store.engine.StoreEngine;
 
 import java.io.*;
 import java.time.LocalDateTime;
@@ -18,6 +18,14 @@ import java.util.List;
 /**
  * Handles loading and saving order history to/from a CSV file.
  * Centralizes all file I/O for orders and prevents parallel writes.
+ *
+ * CSV formats supported:
+ *
+ * 1) NEW (recommended):
+ *    username,orderId,total,createdAt,itemsSummary
+ *
+ * 2) OLD (backward compatible):
+ *    orderId,total,createdAt,itemsSummary
  */
 public class OrderHistoryIO {
 
@@ -29,6 +37,9 @@ public class OrderHistoryIO {
     /**
      * Appends an order to the history file.
      *
+     * New format:
+     *   username,orderId,total,createdAt,itemsSummary
+     *
      * @param order order to save
      */
     public static void appendOrder(Order order) {
@@ -37,22 +48,16 @@ public class OrderHistoryIO {
         synchronized (ORDER_FILE_LOCK) {
             try (BufferedWriter writer = new BufferedWriter(new FileWriter(ORDER_HISTORY_FILE, true))) {
 
-                StringBuilder itemsSummary = new StringBuilder();
-                for (CartItem item : order.getItems()) {
-                    if (item.getProduct() == null) continue;
+                String itemsSummary = buildItemsSummary(order);
 
-                    itemsSummary.append(item.getProduct().getName())
-                            .append(" x")
-                            .append(item.getQuantity())
-                            .append(";");
-                }
-
+                // IMPORTANT: username first (so admin/history can filter + show owner)
                 String line = String.format(
-                        "%d,%.2f,%s,%s",
+                        "%s,%d,%.2f,%s,%s",
+                        safeCsv(order.getCustomerUsername()),
                         order.getOrderID(),
                         order.getTotalAmount(),
                         order.getCreatedAt(),
-                        itemsSummary
+                        safeCsv(itemsSummary)
                 );
 
                 writer.write(line);
@@ -64,9 +69,27 @@ public class OrderHistoryIO {
         }
     }
 
+    private static String buildItemsSummary(Order order) {
+        StringBuilder itemsSummary = new StringBuilder();
+        for (CartItem item : order.getItems()) {
+            if (item == null || item.getProduct() == null) continue;
+
+            // Keep it simple: ProductName xQTY;
+            itemsSummary.append(item.getProduct().getName())
+                    .append(" x")
+                    .append(item.getQuantity())
+                    .append(";");
+        }
+        return itemsSummary.toString();
+    }
+
     /**
      * Loads order history from file if it exists.
      * Uses StoreEngine to resolve products by name (so items will reference real Product objects).
+     *
+     * Supports BOTH:
+     *  - NEW format: username,orderId,total,createdAt,itemsSummary
+     *  - OLD format: orderId,total,createdAt,itemsSummary
      *
      * @param engine engine used to resolve products by name
      * @return list of loaded orders
@@ -84,29 +107,21 @@ public class OrderHistoryIO {
                 String line;
 
                 while ((line = reader.readLine()) != null) {
+                    String trimmed = line.trim();
+                    if (trimmed.isEmpty()) continue;
 
-                    String[] parts = line.split(",", 4);
-                    if (parts.length < 4) continue;
-
-                    int orderId;
-                    double total;
-                    try {
-                        orderId = Integer.parseInt(parts[0].trim());
-                        total = Double.parseDouble(parts[1].trim());
-                    } catch (NumberFormatException ex) {
+                    // Try NEW format first (5 fields)
+                    Order parsed = tryParseNewFormat(engine, trimmed);
+                    if (parsed != null) {
+                        loaded.add(parsed);
                         continue;
                     }
 
-                    LocalDateTime createdAt;
-                    try {
-                        createdAt = LocalDateTime.parse(parts[2].trim());
-                    } catch (Exception ex) {
-                        createdAt = LocalDateTime.now();
+                    // Fallback to OLD format (4 fields)
+                    parsed = tryParseOldFormat(engine, trimmed);
+                    if (parsed != null) {
+                        loaded.add(parsed);
                     }
-
-                    List<CartItem> items = parseItemsSummary(engine, parts[3].trim());
-                    Order order = new Order(orderId, items, total, createdAt);
-                    loaded.add(order);
                 }
 
             } catch (IOException e) {
@@ -115,6 +130,69 @@ public class OrderHistoryIO {
         }
 
         return loaded;
+    }
+
+    /**
+     * NEW format:
+     *   username,orderId,total,createdAt,itemsSummary
+     */
+    private static Order tryParseNewFormat(StoreEngine engine, String line) {
+        // split to 5: username, orderId, total, createdAt, rest(items)
+        String[] parts = line.split(",", 5);
+        if (parts.length < 5) return null;
+
+        String username = unsafecsv(parts[0]).trim();
+        if (username.isEmpty()) username = Order.UNKNOWN_CUSTOMER;
+
+        int orderId;
+        double total;
+        try {
+            orderId = Integer.parseInt(parts[1].trim());
+            total = Double.parseDouble(parts[2].trim());
+        } catch (NumberFormatException ex) {
+            return null;
+        }
+
+        LocalDateTime createdAt = parseDate(parts[3]);
+
+        List<CartItem> items = parseItemsSummary(engine, unsafecsv(parts[4]).trim());
+
+        // uses your new constructor Order(String username, int id, List<CartItem>, double, LocalDateTime)
+        return new Order(username, orderId, items, total, createdAt);
+    }
+
+    /**
+     * OLD format:
+     *   orderId,total,createdAt,itemsSummary
+     *
+     * username will be UNKNOWN.
+     */
+    private static Order tryParseOldFormat(StoreEngine engine, String line) {
+        String[] parts = line.split(",", 4);
+        if (parts.length < 4) return null;
+
+        int orderId;
+        double total;
+        try {
+            orderId = Integer.parseInt(parts[0].trim());
+            total = Double.parseDouble(parts[1].trim());
+        } catch (NumberFormatException ex) {
+            return null;
+        }
+
+        LocalDateTime createdAt = parseDate(parts[2]);
+
+        List<CartItem> items = parseItemsSummary(engine, parts[3].trim());
+
+        return new Order(orderId, items, total, createdAt); // backward-compatible constructor => UNKNOWN
+    }
+
+    private static LocalDateTime parseDate(String text) {
+        try {
+            return LocalDateTime.parse(text.trim());
+        } catch (Exception ex) {
+            return LocalDateTime.now();
+        }
     }
 
     private static List<CartItem> parseItemsSummary(StoreEngine engine, String summary) {
@@ -136,12 +214,28 @@ public class OrderHistoryIO {
                 continue;
             }
 
-            Product p = (engine == null) ? null : engine.findProductPublic(parts[0].trim());
+            String productName = parts[0].trim();
+            Product p = (engine == null) ? null : engine.findProductPublic(productName);
             if (p != null) {
                 result.add(new CartItem(p, qty));
             }
         }
 
         return result;
+    }
+
+    /**
+     * Very small "CSV safety":
+     * we replace commas to keep the format stable.
+     * (We intentionally keep it simple for this assignment.)
+     */
+    private static String safeCsv(String s) {
+        if (s == null) return "";
+        // replace commas so they won't break our split(",")
+        return s.replace(",", " ");
+    }
+
+    private static String unsafecsv(String s) {
+        return (s == null) ? "" : s;
     }
 }

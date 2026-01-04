@@ -118,6 +118,33 @@ public class StoreEngine {
         return true;
     }
 
+    /**
+     * Finds an already-registered customer by username.
+     * Useful for "login" without passwords (simple separation between customers).
+     *
+     * @param username customer's username
+     * @return matching customer or null
+     */
+    public Customer findCustomerByUsername(String username) {
+        if (username == null) return null;
+        String u = username.trim();
+        if (u.isEmpty()) return null;
+
+        for (Customer c : customers) {
+            if (c != null && c.getUsername() != null && c.getUsername().equalsIgnoreCase(u)) {
+                return c;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Returns a copy of all registered customers.
+     */
+    public List<Customer> getCustomers() {
+        return new ArrayList<>(customers);
+    }
+
     // ------------------------------------------------------------------------
     // Order Management
     // ------------------------------------------------------------------------
@@ -127,12 +154,46 @@ public class StoreEngine {
     }
 
     /**
-     * Creates an order from the given cart.
+     * NEW (recommended): Creates an order from the given customer.
      * The cart is cleared after successful creation.
+     * The order will include the customer's username, so order-history can be filtered per customer.
+     *
+     * @param customer the customer who performs checkout
+     * @return created order, or null if failed
+     */
+    public Order createOrderFromCustomer(Customer customer) {
+        if (customer == null) return null;
+
+        Cart cart = customer.getCart();
+        if (cart == null || cart.isEmpty()) {
+            return null;
+        }
+
+        nextOrderId++;
+
+        Order newOrder = new Order(
+                customer.getUsername(),
+                nextOrderId,
+                cart.getItems(),
+                cart.calculateTotal()
+        );
+
+        allOrders.add(newOrder);
+        cart.clear();
+
+        return newOrder;
+    }
+
+    /**
+     * Backward-compatible method (existing code can keep using it),
+     * but it will create orders with UNKNOWN customer.
+     *
+     * Prefer {@link #createOrderFromCustomer(Customer)} for correct history separation.
      *
      * @param cart shopping cart
      * @return created order, or null if failed
      */
+    @Deprecated
     public Order createOrderFromCart(Cart cart) {
         if (cart == null || cart.isEmpty()) {
             return null;

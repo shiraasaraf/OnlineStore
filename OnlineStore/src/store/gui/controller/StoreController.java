@@ -170,9 +170,29 @@ public class StoreController {
      */
     public List<Order> getCustomerOrders() {
         synchronized (engine) {
-            return customer.getOrderHistory();
+            List<Order> result = new ArrayList<>();
+            if (customer == null || customer.getUsername() == null) {
+                return result;
+            }
+
+            String username = customer.getUsername().trim();
+            if (username.isEmpty()) {
+                return result;
+            }
+
+            for (Order o : engine.getAllOrders()) {
+                if (o == null) continue;
+
+                String owner = o.getCustomerUsername();
+                if (owner != null && owner.equalsIgnoreCase(username)) {
+                    result.add(o);
+                }
+            }
+
+            return result;
         }
     }
+
 
     /**
      * Performs checkout for the current customer.
@@ -235,7 +255,9 @@ public class StoreController {
             }
 
             // 3) Create order in engine (engine adds it to allOrders and clears cart)
-            Order order = engine.createOrderFromCart(cart);
+            // IMPORTANT: create order with the real customer username (not UNKNOWN)
+            Order order = engine.createOrderFromCustomer(customer);
+
             if (order == null) {
                 // rollback stock if engine failed to create order
                 for (CartItem item : decreased) {
