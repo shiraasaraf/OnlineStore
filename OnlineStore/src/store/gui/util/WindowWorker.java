@@ -1,33 +1,43 @@
+/**
+ * Submitted by:
+ * Tamar Nahum, ID 021983812
+ * Shira Asaraf, ID 322218439
+ */
 package store.gui.util;
 
 import javax.swing.*;
-import java.util.concurrent.*;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
 /**
- * Runs business tasks on a dedicated single thread per window.
- * UI callbacks are always executed on the Swing EDT.
+ * Utility for running tasks off the Swing EDT and updating the UI on the EDT.
  */
-public final class WindowWorker implements AutoCloseable {
+public final class WindowWorker {
 
     private final ExecutorService executor;
-    private final String threadName;
 
+    /**
+     * Creates a single-thread worker for the owning window.
+     *
+     * @param threadName name for the created worker thread
+     */
     public WindowWorker(String threadName) {
-        this.threadName = threadName;
         this.executor = Executors.newSingleThreadExecutor(r -> {
-            Thread t = new Thread(r);
-            t.setName(threadName);
+            Thread t = new Thread(r, threadName);
             t.setDaemon(true);
             return t;
         });
     }
 
-    public String getThreadName() {
-        return threadName;
-    }
-
+    /**
+     * Runs a task in the background and optionally updates the UI on success.
+     *
+     * @param task      background task
+     * @param onSuccess runs on the Swing EDT after success (may be null)
+     * @param onError   runs on the Swing EDT if an error occurs (may be null)
+     */
     public void runAsync(Runnable task, Runnable onSuccess, Consumer<Throwable> onError) {
         executor.submit(() -> {
             try {
@@ -43,6 +53,14 @@ public final class WindowWorker implements AutoCloseable {
         });
     }
 
+    /**
+     * Runs a task that returns a value in the background and passes the result to the UI on success.
+     *
+     * @param task      background task that returns a value
+     * @param onSuccess runs on the Swing EDT with the task result (may be null)
+     * @param onError   runs on the Swing EDT if an error occurs (may be null)
+     * @param <T>       result type
+     */
     public <T> void runAsync(Supplier<T> task, Consumer<T> onSuccess, Consumer<Throwable> onError) {
         executor.submit(() -> {
             try {
@@ -58,8 +76,10 @@ public final class WindowWorker implements AutoCloseable {
         });
     }
 
-    @Override
+    /**
+     * Stops the worker thread.
+     */
     public void close() {
-        executor.shutdownNow();
+        executor.shutdown();
     }
 }

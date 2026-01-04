@@ -3,7 +3,6 @@
  * Tamar Nahum, ID 021983812
  * Shira Asaraf, ID 322218439
  */
-
 package store.core;
 
 import store.cart.Cart;
@@ -16,26 +15,26 @@ import java.util.List;
 
 /**
  * Represents a customer in the store system.
- * A customer has a shopping cart and a list of past orders.
- * The customer can add items to the cart, remove them, and keep order history.
- *
  * <p>
- * Note: The customer does NOT communicate directly with the StoreEngine.
- * Order creation is handled by the Controller/Engine (MVC separation).
+ * A customer owns a {@link Cart} and maintains an order history.
+ * This class does not communicate directly with the engine; checkout/order creation
+ * is handled by the controller/engine (MVC separation).
  * </p>
  */
 public class Customer extends User {
 
-    // Data members
+    /** The customer's shopping cart. */
     private final Cart cart;
+
+    /** List of orders placed by the customer (order history). */
     private final List<Order> orderHistory;
 
     /**
-     * Constructs a new Customer with an empty cart and an empty order history.
-     * Username and email validation is handled by the {@link User} constructor.
+     * Constructs a new customer with an empty cart and an empty order history.
+     * Username and email validation are handled by {@link User}.
      *
-     * @param username the customer's username
-     * @param email    the customer's email address
+     * @param username customer's username
+     * @param email    customer's email address
      */
     public Customer(String username, String email) {
         super(username, email);
@@ -43,19 +42,17 @@ public class Customer extends User {
         this.orderHistory = new ArrayList<>();
     }
 
-    // ------------------------------------------------------------------------------------
-
     /**
-     * Returns the shopping cart associated with this customer.
+     * Returns the customer's cart.
      *
-     * @return the customer's cart
+     * @return cart instance
      */
     public Cart getCart() {
         return cart;
     }
 
     /**
-     * Returns current cart items.
+     * Returns a defensive copy of the cart items.
      *
      * @return list of cart items
      */
@@ -64,63 +61,54 @@ public class Customer extends User {
     }
 
     /**
-     * Returns a copy of the customer's order history to preserve encapsulation.
+     * Returns a defensive copy of the customer's order history.
      *
-     * @return a copy of the order history list
+     * @return copy of order history list
      */
     public List<Order> getOrderHistory() {
         return new ArrayList<>(orderHistory);
     }
 
-    // ------------------------------------------------------------------------------------
-
     /**
-     * Adds a product to the customer's cart.
-     * The method checks that the product is not null, the quantity is positive,
-     * and there is enough stock.
-     *
+     * Adds a product to the cart.
      * <p>
-     * Note: Stock is NOT updated here — only when an order is actually created
-     * by the controller/engine.
+     * This method performs basic validation and checks that current stock is sufficient.
+     * Stock is not decreased here; stock changes happen only during checkout.
      * </p>
      *
-     * @param p        the product to add
-     * @param quantity the amount to add (must be greater than zero)
-     * @return true if the product was added, false otherwise
+     * @param product  product to add
+     * @param quantity quantity to add (must be &gt; 0)
+     * @return true if added; false otherwise
      */
-    public boolean addToCart(Product p, int quantity) {
-
-        if (p == null || quantity <= 0) {
+    public boolean addToCart(Product product, int quantity) {
+        if (product == null || quantity <= 0) {
             return false;
         }
-
-        // check if there is enough stock – but do not change it yet
-        if (p.getStock() < quantity) {
+        if (product.getStock() < quantity) {
             return false;
         }
-
-        return cart.addItem(p, quantity);
+        return cart.addItem(product, quantity);
     }
 
     /**
-     * Removes a product completely from the customer's cart.
+     * Removes a product completely from the cart.
      *
-     * @param p the product to remove
-     * @return true if the product was removed from the cart, false otherwise
+     * @param product product to remove
+     * @return true if removed; false otherwise
      */
-    public boolean removeFromCart(Product p) {
-        if (p == null) {
+    public boolean removeFromCart(Product product) {
+        if (product == null) {
             return false;
         }
-        return cart.removeItem(p);
+        return cart.removeItem(product);
     }
 
     /**
-     * Adds an order to the customer's order history.
-     * This is called by the controller after the engine successfully creates the order.
+     * Adds an order to the customer's history.
+     * Called by the controller after a successful checkout.
      *
-     * @param order the created order
-     * @return true if added, false otherwise
+     * @param order order to add
+     * @return true if added; false if order is null
      */
     public boolean addOrder(Order order) {
         if (order == null) {
@@ -130,20 +118,14 @@ public class Customer extends User {
         return true;
     }
 
-    // ------------------------------------------------------------------------------------
-
     /**
-     * Returns a simple string representation of the customer, including
-     * information from the User class and the number of completed orders.
+     * Returns a human-readable representation of the customer, including
+     * user details and the number of past orders.
      *
-     * @return string representing the customer
+     * @return customer string
      */
     @Override
     public String toString() {
-        return "Customer\n" +
-                super.toString() + "\n" +
-                "Number of orders: " + orderHistory.size();
+        return "Customer\n" + super.toString() + "\nNumber of orders: " + orderHistory.size();
     }
-
-    // equals implemented in parent class
 }

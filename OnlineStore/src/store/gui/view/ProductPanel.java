@@ -150,16 +150,45 @@ public class ProductPanel extends JPanel {
         setToolTipText(buildTooltip());
     }
 
+    /**
+     * Returns the currently displayed product.
+     *
+     * @return the current {@link Product}, or {@code null} if no product is selected
+     */
     public Product getProduct() {
         return product;
     }
 
+    /**
+     * Updates the stock-related UI elements based on the current product state.
+     * <p>
+     * If the product is out of stock (stock &lt;= 0), an "out of stock" badge is shown
+     * and the price label is displayed in a muted (gray) color. Otherwise, the badge
+     * is hidden and the price label is displayed in its normal color.
+     * </p>
+     * <p>
+     * If no product is currently selected, the badge is hidden and the price label
+     * is displayed using the default color.
+     * </p>
+     */
     private void applyStockUi() {
         boolean outOfStock = (product != null && product.getStock() <= 0);
         outOfStockBadge.setVisible(outOfStock);
         priceLabel.setForeground(outOfStock ? Color.GRAY : Color.BLACK);
     }
 
+    /**
+     * Builds an HTML tooltip describing the current product.
+     * <p>
+     * The tooltip includes the product name, price, stock status, and a short
+     * description. The description is trimmed and truncated to a maximum length
+     * to keep the tooltip readable. All dynamic text is safely escaped to prevent
+     * malformed HTML rendering.
+     * </p>
+     *
+     * @return an HTML-formatted tooltip string, or {@code "No product"} if no product
+     *         is currently selected
+     */
     private String buildTooltip() {
         if (product == null) return "No product";
 
@@ -172,7 +201,7 @@ public class ProductPanel extends JPanel {
         desc = desc.trim();
         if (desc.isEmpty()) desc = "-";
 
-        // כדי שהטקסט לא יהיה ענק אם יש תיאור ארוך:
+
         int maxLen = 160;
         if (desc.length() > maxLen) {
             desc = desc.substring(0, maxLen) + "...";
@@ -186,7 +215,18 @@ public class ProductPanel extends JPanel {
                 + "</html>";
     }
 
-
+    /**
+     * Safely escapes basic HTML special characters in a string.
+     * <p>
+     * This method replaces the characters '&lt;' and '&gt;' with their corresponding
+     * HTML entities to prevent malformed HTML or unintended markup when rendering
+     * text inside HTML-based Swing components (such as {@link JLabel} with HTML content).
+     * If the input string is {@code null}, an empty string is returned.
+     * </p>
+     *
+     * @param s the input string to escape (may be {@code null})
+     * @return a non-null string with basic HTML characters escaped
+     */
     private String safe(String s) {
         return (s == null) ? "" : s.replace("<", "&lt;").replace(">", "&gt;");
     }

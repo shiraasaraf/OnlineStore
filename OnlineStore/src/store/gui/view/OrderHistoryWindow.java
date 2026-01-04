@@ -13,21 +13,32 @@ import store.order.Order;
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 
 /**
- * Dialog window that displays the order history in a table.
+ * Modal dialog that displays order history in a non-editable table.
  * <p>
- * - Manager can see all orders of all customers.
- * - Customer can see only their own orders.
+ * The displayed data depends on the current user's permissions, as determined by the
+ * provided {@link StoreController}:
+ * </p>
+ * <ul>
+ *   <li>If {@code controller.canManage()} is {@code true}, all orders are displayed and an
+ *       additional "Customer" column is shown.</li>
+ *   <li>Otherwise, only the current customer's orders are displayed.</li>
+ * </ul>
+ * <p>
+ * Data is fetched from the controller and loaded into the table when the dialog is created,
+ * and can be refreshed manually by clicking the "Refresh" button.
  * </p>
  */
 public class OrderHistoryWindow extends JDialog {
 
-    /** Controller used to fetch orders. */
+    /** Controller used to fetch orders. May be {@code null}. */
     private final StoreController controller;
 
-    /** Table model for orders. */
+    /** Table model for orders (non-editable). */
     private final DefaultTableModel tableModel;
 
     /** Orders table. */
@@ -39,11 +50,20 @@ public class OrderHistoryWindow extends JDialog {
     /** Closes the dialog. */
     private final JButton closeButton;
 
+    /** Date-time formatter used for displaying order creation time. */
+    private static final DateTimeFormatter DATE_TIME_FORMAT =
+            DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss");
+
     /**
-     * Creates a modal order history dialog.
+     * Creates a modal "Order History" dialog.
+     * <p>
+     * The dialog builds its table columns based on whether the provided controller has
+     * manager permissions. Data is loaded immediately by calling {@link #refreshOrders()}.
+     * If {@code controller} is {@code null}, the dialog opens but remains empty.
+     * </p>
      *
-     * @param parent     parent frame
-     * @param controller store controller
+     * @param parent     the parent frame used for modality and centering
+     * @param controller the store controller used to fetch orders (may be {@code null})
      */
     public OrderHistoryWindow(JFrame parent, StoreController controller) {
         super(parent, "Order History", true);
@@ -90,7 +110,11 @@ public class OrderHistoryWindow extends JDialog {
 
     /**
      * Reloads the table contents from the controller.
-     * Manager sees all orders; customer sees only their own orders.
+     * <p>
+     * If the controller has manager permissions, all orders are loaded; otherwise,
+     * only the current customer's orders are loaded. The table is cleared before
+     * inserting the refreshed rows.
+     * </p>
      */
     public void refreshOrders() {
         tableModel.setRowCount(0);
@@ -131,9 +155,13 @@ public class OrderHistoryWindow extends JDialog {
 
     /**
      * Builds a readable items summary for an order.
+     * <p>
+     * The summary format is a semicolon-separated list of items:
+     * {@code "ProductName xQuantity; ProductName xQuantity; ..."}.
+     * </p>
      *
-     * @param order the order
-     * @return items summary string
+     * @param order the order whose items should be summarized
+     * @return a summary string, or an empty string if the order has no items
      */
     private String buildItemsSummary(Order order) {
         if (order == null || order.getItems() == null) {
@@ -157,11 +185,14 @@ public class OrderHistoryWindow extends JDialog {
         return sb.toString();
     }
 
-    private String formatDateTime(java.time.LocalDateTime dt) {
+    /**
+     * Formats the given date-time value for display in the orders table.
+     *
+     * @param dt the date-time to format
+     * @return a formatted string, or an empty string if {@code dt} is {@code null}
+     */
+    private String formatDateTime(LocalDateTime dt) {
         if (dt == null) return "";
-        java.time.format.DateTimeFormatter f =
-                java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss");
-        return dt.format(f);
+        return dt.format(DATE_TIME_FORMAT);
     }
-
 }

@@ -110,7 +110,6 @@ public class Order implements Persistable {
      */
     @Override
     public void saveToFile(String path) {
-        // TODO: Implement persistence logic
     }
 
     // ------------------------------------------------------------------------

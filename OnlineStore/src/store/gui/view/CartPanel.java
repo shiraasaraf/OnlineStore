@@ -3,7 +3,6 @@
  * Tamar Nahum, ID 021983812
  * Shira Asaraf, ID 322218439
  */
-
 package store.gui.view;
 
 import store.cart.CartItem;
@@ -12,16 +11,21 @@ import store.products.Product;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ActionListener;
+import java.text.NumberFormat;
 import java.util.List;
+import java.util.Locale;
 
 /**
  * Swing panel that displays the shopping cart contents.
  * <p>
- * Shows a list of cart items, total price, and a checkout button.
- * The controller attaches listeners for removing items and for checkout.
+ * Shows cart items, total price, and a checkout button.
+ * A controller can attach listeners for removing items and for checkout.
  * </p>
  */
 public class CartPanel extends JPanel {
+
+    /** Key used to store the {@link CartItem} on the remove button via client properties. */
+    public static final String PROP_CART_ITEM = "cartItem";
 
     /** Panel that holds item rows. */
     private final JPanel itemsPanel;
@@ -35,6 +39,8 @@ public class CartPanel extends JPanel {
     /** Listener used for "Remove" buttons (installed by the controller). */
     private ActionListener removeListener;
 
+    private final NumberFormat currency = NumberFormat.getCurrencyInstance(Locale.US);
+
     /**
      * Constructs an empty cart panel UI.
      */
@@ -45,10 +51,9 @@ public class CartPanel extends JPanel {
         itemsPanel = new JPanel();
         itemsPanel.setLayout(new BoxLayout(itemsPanel, BoxLayout.Y_AXIS));
 
-        JScrollPane scroll = new JScrollPane(itemsPanel);
-        add(scroll, BorderLayout.CENTER);
+        add(new JScrollPane(itemsPanel), BorderLayout.CENTER);
 
-        totalLabel = new JLabel("Total: $0.00");
+        totalLabel = new JLabel("Total: " + currency.format(0.0));
         checkoutButton = new JButton("Checkout");
 
         JPanel bottom = new JPanel(new BorderLayout());
@@ -61,19 +66,18 @@ public class CartPanel extends JPanel {
     /**
      * Updates the displayed cart items and total.
      *
-     * @param items cart items to display
+     * @param items cart items to display (not modified by this component)
      */
     public void setItems(List<CartItem> items) {
         itemsPanel.removeAll();
 
         double total = 0.0;
-
         for (CartItem item : items) {
             itemsPanel.add(createRow(item));
             total += item.getTotalPrice();
         }
 
-        totalLabel.setText("Total: $" + total);
+        totalLabel.setText("Total: " + currency.format(total));
 
         itemsPanel.revalidate();
         itemsPanel.repaint();
@@ -82,7 +86,9 @@ public class CartPanel extends JPanel {
     /**
      * Installs a listener for item removal actions.
      * <p>
-     * The listener is triggered when any "Remove" button is pressed.
+     * When a "Remove" button is pressed, the event source is the button.
+     * The controller can retrieve the related {@link CartItem} using:
+     * {@code ((JButton)e.getSource()).getClientProperty(PROP_CART_ITEM)}.
      * </p>
      *
      * @param l listener to install
@@ -117,14 +123,14 @@ public class CartPanel extends JPanel {
         String name = (p == null) ? "Unknown" : p.getDisplayName();
         double unitPrice = (p == null) ? 0.0 : p.getPrice();
 
-        JLabel info = new JLabel(name + " | Unit: $" + unitPrice + " | Qty: " + item.getQuantity());
+        JLabel info = new JLabel(name + " | Unit: " + currency.format(unitPrice) + " | Qty: " + item.getQuantity());
         row.add(info, BorderLayout.CENTER);
 
         JPanel right = new JPanel(new FlowLayout(FlowLayout.RIGHT, 6, 0));
-        JLabel lineTotal = new JLabel("$" + item.getTotalPrice());
+        JLabel lineTotal = new JLabel(currency.format(item.getTotalPrice()));
 
         JButton removeButton = new JButton("Remove");
-        removeButton.putClientProperty("product", p);
+        removeButton.putClientProperty(PROP_CART_ITEM, item);
 
         removeButton.addActionListener(e -> {
             if (removeListener != null) {
@@ -134,7 +140,6 @@ public class CartPanel extends JPanel {
 
         right.add(lineTotal);
         right.add(removeButton);
-
         row.add(right, BorderLayout.EAST);
 
         return row;

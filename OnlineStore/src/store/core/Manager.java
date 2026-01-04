@@ -3,33 +3,32 @@
  * Tamar Nahum, ID 021983812
  * Shira Asaraf, ID 322218439
  */
-
-
 package store.core;
 
 /**
- * Represents a store manager (administrator) in the store system.
- * A manager is allowed to perform administrative actions such as
- * loading and saving products from/to files.
+ * Represents a store manager (administrator).
+ * <p>
+ * A manager has the same basic identity properties as a {@link User},
+ * but is granted administrative permissions by the controller layer.
+ * </p>
  */
 public class Manager extends User {
 
-
     /**
-     * Constructs a new Manager.
-     * Username and email validation is handled by the {@link User} constructor.
+     * Constructs a new manager.
+     * Username and email validation are handled by {@link User}.
      *
      * @param username manager username
-     * @param email    manager email
+     * @param email    manager email address
      */
     public Manager(String username, String email) {
         super(username, email);
     }
 
     /**
-     * Returns a string representation of the manager.
+     * Returns a human-readable representation of the manager.
      *
-     * @return manager details
+     * @return manager string
      */
     @Override
     public String toString() {

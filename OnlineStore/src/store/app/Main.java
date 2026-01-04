@@ -7,26 +7,25 @@ package store.app;
 
 import store.engine.StoreEngine;
 import store.gui.view.LauncherWindow;
+import store.io.OrderHistoryIO;
 import store.io.ProductCatalogIO;
 import store.products.Product;
-import store.io.OrderHistoryIO;
 
-import javax.swing.*;
+import javax.swing.SwingUtilities;
 import java.io.File;
 import java.io.IOException;
 import java.util.List;
 
 /**
- * Main application class.
  * Application entry point.
  * <p>
- * Initializes the store engine, loads a default product catalog if available,
- * and launches the main launcher window (which stays open).
+ * Initializes the shared {@link StoreEngine}, loads a default product catalog
+ * (if available), loads order history, and launches the {@link LauncherWindow}.
  * </p>
  */
 public class Main {
 
-    /** Default catalog file name. */
+    /** Default catalog CSV file name. */
     private static final String DEFAULT_CATALOG_FILE = "products_catalog.csv";
 
     /**
@@ -35,31 +34,44 @@ public class Main {
      * @param args command-line arguments (not used)
      */
     public static void main(String[] args) {
-
         SwingUtilities.invokeLater(() -> {
-
             StoreEngine engine = StoreEngine.getInstance();
 
-            // Load default catalog if exists
-            File file = new File(DEFAULT_CATALOG_FILE);
-            if (file.exists() && file.isFile()) {
-                try {
-                    List<Product> loaded = ProductCatalogIO.loadProductsFromFile(file);
-                    for (Product p : loaded) {
-                        engine.addProduct(p);
-                    }
-                } catch (IOException ex) {
-                    ex.printStackTrace();
-                }
-            }
+            loadDefaultCatalog(engine);
+            loadOrderHistory(engine);
 
-            //load existing orders history
-            engine.addLoadedOrders(OrderHistoryIO.loadOrders(engine));
-
-            // Required in EX3: launcher stays open and can open multiple customer/admin windows
             LauncherWindow launcher = new LauncherWindow(engine);
             launcher.setVisible(true);
-
         });
+    }
+
+    /**
+     * Loads products from the default catalog CSV file into the engine if the file exists.
+     *
+     * @param engine shared store engine
+     */
+    private static void loadDefaultCatalog(StoreEngine engine) {
+        File file = new File(DEFAULT_CATALOG_FILE);
+        if (!file.exists() || !file.isFile()) {
+            return;
+        }
+
+        try {
+            List<Product> loaded = ProductCatalogIO.loadProductsFromFile(file);
+            for (Product p : loaded) {
+                engine.addProduct(p);
+            }
+        } catch (IOException ex) {
+            ex.printStackTrace();
+        }
+    }
+
+    /**
+     * Loads existing orders from the history file into the engine.
+     *
+     * @param engine shared store engine
+     */
+    private static void loadOrderHistory(StoreEngine engine) {
+        engine.addLoadedOrders(OrderHistoryIO.loadOrders(engine));
     }
 }

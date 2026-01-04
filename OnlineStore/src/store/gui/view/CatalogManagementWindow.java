@@ -44,10 +44,22 @@ public class CatalogManagementWindow extends JDialog {
     private final JSpinner stockSpinner;
 
     /**
-     * Constructs the catalog management dialog (manager-only).
+     * Constructs the catalog / inventory management dialog.
+     * <p>
+     * This dialog is available to managers only and provides functionality for:
+     * deleting products, increasing or decreasing stock levels, and adding new
+     * products to the catalog. The dialog displays the current product list and
+     * allows performing management operations via the {@link StoreController}.
+     * </p>
+     * <p>
+     * If the current user does not have manager permissions, an error message is
+     * shown and the dialog is closed immediately.
+     * </p>
      *
-     * @param parentWindow parent store window
-     * @param controller   store controller
+     * @param parentWindow the parent {@link StoreWindow} that owns this dialog
+     * @param controller   the store controller used to perform catalog operations
+     *
+     * @throws IllegalStateException if the user does not have manager permissions
      */
     public CatalogManagementWindow(StoreWindow parentWindow, StoreController controller) {
         super(parentWindow, "Catalog / Inventory Management", true);
@@ -74,6 +86,13 @@ public class CatalogManagementWindow extends JDialog {
         productList = new JList<>(listModel);
         productList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
 
+        /**
+         * Custom list cell renderer for displaying product details in the catalog list.
+         * <p>
+         * Each list entry shows the product name, category, price, and current
+         * stock amount in a readable single-line format.
+         * </p>
+         */
         productList.setCellRenderer(new DefaultListCellRenderer() {
             @Override
             public Component getListCellRendererComponent(JList<?> list,
@@ -141,6 +160,15 @@ public class CatalogManagementWindow extends JDialog {
         closeButton.addActionListener(e -> dispose());
     }
 
+    /**
+     * Reloads the product list displayed in this management dialog.
+     * <p>
+     * Clears the current list model and repopulates it with all products
+     * retrieved from the {@link StoreController}. This method reflects the
+     * current state of the catalog and should be called after any catalog
+     * modification.
+     * </p>
+     */
     private void refreshProductList() {
         listModel.clear();
         List<Product> products = controller.getAllProducts();
@@ -149,6 +177,17 @@ public class CatalogManagementWindow extends JDialog {
         }
     }
 
+    /**
+     * Retrieves the stock change amount from the stock spinner.
+     * <p>
+     * The spinner value is expected to be a positive number. This method safely
+     * converts the spinner value to an integer, handling different numeric types.
+     * If the value cannot be interpreted as a number, a default value of {@code 1}
+     * is returned.
+     * </p>
+     *
+     * @return the stock change amount as an integer (minimum of 1)
+     */
     private int getStockDelta() {
         Object v = stockSpinner.getValue();
         if (v instanceof Integer) return (Integer) v;
@@ -156,6 +195,16 @@ public class CatalogManagementWindow extends JDialog {
         return 1;
     }
 
+    /**
+     * Retrieves the currently selected product from the product list.
+     * <p>
+     * If no product is selected, a warning dialog is shown to the user and
+     * {@code null} is returned. This method is typically used by action
+     * handlers that require a selected product in order to proceed.
+     * </p>
+     *
+     * @return the selected {@link Product}, or {@code null} if no selection exists
+     */
     private Product getSelectedOrWarn() {
         Product selected = productList.getSelectedValue();
         if (selected == null) {
@@ -169,6 +218,14 @@ public class CatalogManagementWindow extends JDialog {
         return selected;
     }
 
+    /**
+     * Refreshes all relevant UI components after a catalog change.
+     * <p>
+     * Updates the product list displayed in this management dialog and
+     * notifies the parent {@link StoreWindow} to refresh its catalog view,
+     * ensuring that all open views reflect the most recent catalog state.
+     * </p>
+     */
     private void refreshEverywhere() {
         refreshProductList();
         parentWindow.refreshCatalogView();
@@ -191,6 +248,21 @@ public class CatalogManagementWindow extends JDialog {
         }
     }
 
+    /**
+     * Handles the "Delete selected product" button action.
+     * <p>
+     * Attempts to remove the currently selected product from the catalog.
+     * If no product is selected, a warning is shown and the operation is aborted.
+     * Before deletion, a confirmation dialog is displayed to prevent accidental
+     * removal. If the removal operation fails, an error message is shown.
+     * </p>
+     * <p>
+     * After a successful removal, the catalog is saved to the default CSV file
+     * and all relevant UI views are refreshed.
+     * </p>
+     *
+     * @param e the action event fired by the "Delete selected product" button
+     */
     private void onRemoveClicked(ActionEvent e) {
         Product selected = getSelectedOrWarn();
         if (selected == null) return;
@@ -213,6 +285,22 @@ public class CatalogManagementWindow extends JDialog {
         refreshEverywhere();
     }
 
+
+    /**
+     * Handles the "Increase Stock" button action.
+     * <p>
+     * Increases the stock of the currently selected product by the amount specified
+     * in the stock spinner. If no product is selected, a warning is shown and the
+     * operation is aborted. If the increase operation fails, an error message is
+     * displayed.
+     * </p>
+     * <p>
+     * After a successful stock update, the catalog is saved to the default CSV file
+     * and all relevant UI views are refreshed.
+     * </p>
+     *
+     * @param e the action event fired by the "Increase Stock" button
+     */
     private void onIncreaseStock(ActionEvent e) {
         Product selected = getSelectedOrWarn();
         if (selected == null) return;
@@ -228,6 +316,21 @@ public class CatalogManagementWindow extends JDialog {
         refreshEverywhere();
     }
 
+    /**
+     * Handles the "Decrease Stock" button action.
+     * <p>
+     * Decreases the stock of the currently selected product by the amount specified
+     * in the stock spinner. If no product is selected, a warning is shown and the
+     * operation is aborted. If the decrease operation fails (for example, due to
+     * insufficient stock), an error message is displayed.
+     * </p>
+     * <p>
+     * After a successful stock update, the catalog is saved to the default CSV file
+     * and all relevant UI views are refreshed.
+     * </p>
+     *
+     * @param e the action event fired by the "Decrease Stock" button
+     */
     private void onDecreaseStock(ActionEvent e) {
         Product selected = getSelectedOrWarn();
         if (selected == null) return;
@@ -248,6 +351,17 @@ public class CatalogManagementWindow extends JDialog {
         refreshEverywhere();
     }
 
+    /**
+     * Handles the "Add New Product" button action.
+     * <p>
+     * Opens the add-product dialog, validates the user input (inside the dialog),
+     * and if a product was created successfully, requests the controller to add it
+     * to the catalog. After a successful add, the catalog is saved to the default
+     * CSV file and the UI is refreshed (both this list and the parent window view).
+     * </p>
+     *
+     * @param e the action event fired by the "Add New Product" button
+     */
     private void onAddProduct(ActionEvent e) {
         Product newProduct = showAddProductDialog();
         if (newProduct == null) return;
@@ -262,18 +376,8 @@ public class CatalogManagementWindow extends JDialog {
         refreshEverywhere();
     }
 
-    /**
-     * Creates a concrete product instance based on the selected Category:
-     * BOOKS -> BookProduct, CLOTHING -> ClothingProduct, ELECTRONICS -> ElectronicsProduct.
-     *
-     * @return created product or null if cancelled/invalid
-     */
-    /**
-     * Creates a concrete product instance based on the selected Category:
-     * BOOKS -> BookProduct, CLOTHING -> ClothingProduct, ELECTRONICS -> ElectronicsProduct.
-     *
-     * @return created product or null if cancelled/invalid
-     */
+
+
     /**
      * Creates a concrete product instance based on the selected Category:
      * BOOKS -> BookProduct, CLOTHING -> ClothingProduct, ELECTRONICS -> ElectronicsProduct.

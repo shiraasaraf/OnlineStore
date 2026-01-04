@@ -3,7 +3,6 @@
  * Tamar Nahum, ID 021983812
  * Shira Asaraf, ID 322218439
  */
-
 package store.gui.controller;
 
 import store.cart.Cart;
@@ -25,43 +24,30 @@ import java.util.List;
  * Controller for the store GUI.
  * <p>
  * Bridges between the view layer and the model (engine/customer/manager).
- * </p>
- *
- * <p>
- * MVC note:
- * - The Controller performs the "business flow" of checkout.
- * - The Engine handles only data & logic (no file I/O).
- * - File I/O is delegated to store.io classes.
- * </p>
- *
- * <p>
- * Thread-safety note:
- * - Critical operations on shared state are synchronized on the shared engine instance.
- * - File operations are synchronized inside the IO classes.
+ * File I/O is delegated to store.io classes.
+ * Thread-safety: critical operations synchronize on the shared engine instance.
  * </p>
  */
 public class StoreController {
 
-    /**
-     * Lock for product catalog file operations (prevents parallel load/save).
-     */
+    /** Lock for product catalog file operations (prevents parallel load/save). */
     private static final Object PRODUCT_FILE_LOCK = new Object();
 
-    /** Store engine (model). Shared among all windows. */
+    /** Shared store engine (model). */
     private final StoreEngine engine;
 
-    /** Current customer. */
+    /** Current customer (always exists in customer windows). */
     private final Customer customer;
 
-    /** Current manager (null when not in manager mode). */
+    /** Current manager (non-null only in manager mode). */
     private final Manager manager;
 
     /**
-     * Constructs a controller for the given users and engine.
+     * Constructs a controller for the given engine and active user session.
      *
-     * @param engine   store engine (shared model)
-     * @param customer current customer
-     * @param manager  current manager (may be null)
+     * @param engine   shared store engine
+     * @param customer current customer (required for cart/checkout)
+     * @param manager  current manager (null when not in manager mode)
      */
     public StoreController(StoreEngine engine, Customer customer, Manager manager) {
         this.engine = engine;
@@ -85,7 +71,7 @@ public class StoreController {
     }
 
     /**
-     * Returns all products in the catalog.
+     * Returns all products in the catalog (including out-of-stock products).
      *
      * @return list of all products
      */
@@ -96,10 +82,10 @@ public class StoreController {
     }
 
     /**
-     * Removes a product from the catalog.
+     * Removes a product from the catalog (manager usage).
      *
      * @param product product to remove
-     * @return true if removed, false otherwise
+     * @return true if removed; false otherwise
      */
     public boolean removeProduct(Product product) {
         synchronized (engine) {
@@ -108,16 +94,13 @@ public class StoreController {
     }
 
     /**
-     * Loads products from a file and adds them to the engine.
-     * File read is synchronized to prevent parallel access to the same file.
-     * Adding into the engine is synchronized to keep the shared model consistent.
+     * Loads products from a CSV file and adds them to the engine.
      *
      * @param file source file
      * @throws IOException if reading fails
      */
     public void loadProductsFromFile(File file) throws IOException {
         List<Product> loaded;
-
         synchronized (PRODUCT_FILE_LOCK) {
             loaded = ProductCatalogIO.loadProductsFromFile(file);
         }
@@ -130,15 +113,13 @@ public class StoreController {
     }
 
     /**
-     * Saves current products to a file.
-     * Takes a snapshot under engine lock, then writes under file lock.
+     * Saves current products to a CSV file.
      *
      * @param file destination file
      * @throws IOException if writing fails
      */
     public void saveProductsToFile(File file) throws IOException {
         List<Product> snapshot;
-
         synchronized (engine) {
             snapshot = engine.getAllProducts();
         }
@@ -149,11 +130,11 @@ public class StoreController {
     }
 
     // ---------------------------------------------------------------------
-    // Orders
+    // Orders / History
     // ---------------------------------------------------------------------
 
     /**
-     * Returns all orders created in the system.
+     * Returns all orders in the system (manager usage).
      *
      * @return list of all orders
      */
@@ -164,22 +145,24 @@ public class StoreController {
     }
 
     /**
-     * Returns the current customer's order history.
+     * Returns the order history for the current customer only.
+     * Orders are filtered by the username stored in the Order.
      *
-     * @return list of customer's orders
+     * @return list of orders that belong to the current customer
      */
     public List<Order> getCustomerOrders() {
+        List<Order> result = new ArrayList<>();
+
+        if (customer == null || customer.getUsername() == null) {
+            return result;
+        }
+
+        String username = customer.getUsername().trim();
+        if (username.isEmpty()) {
+            return result;
+        }
+
         synchronized (engine) {
-            List<Order> result = new ArrayList<>();
-            if (customer == null || customer.getUsername() == null) {
-                return result;
-            }
-
-            String username = customer.getUsername().trim();
-            if (username.isEmpty()) {
-                return result;
-            }
-
             for (Order o : engine.getAllOrders()) {
                 if (o == null) continue;
 
@@ -188,27 +171,22 @@ public class StoreController {
                     result.add(o);
                 }
             }
-
-            return result;
         }
-    }
 
+        return result;
+    }
 
     /**
      * Performs checkout for the current customer.
-     * This method is synchronized on the shared engine to keep:
-     * stock validation + stock decrease + order creation atomic.
-     *
      * <p>
-     * MVC-perfect flow:
-     * 1) validate stock
-     * 2) decrease stock (with rollback)
-     * 3) engine creates the order from cart (also clears cart + adds to engine orders)
-     * 4) customer adds the order to its personal history
-     * 5) save order history using OrderHistoryIO
+     * Flow:
+     * 1) validate stock for all cart items
+     * 2) decrease stock (rollback on failure)
+     * 3) create order in engine (clears the cart)
+     * 4) append order to order-history file
      * </p>
      *
-     * @return true if checkout succeeded, false otherwise
+     * @return true if checkout succeeded; false otherwise
      */
     public boolean checkout() {
         if (customer == null) {
@@ -223,20 +201,18 @@ public class StoreController {
 
             List<CartItem> items = cart.getItems();
 
-            // 1) Validate stock
+            // validate
             for (CartItem item : items) {
+                if (item == null) return false;
+
                 Product p = item.getProduct();
                 int qty = item.getQuantity();
 
-                if (p == null || qty <= 0) {
-                    return false;
-                }
-                if (p.getStock() < qty) {
-                    return false;
-                }
+                if (p == null || qty <= 0) return false;
+                if (p.getStock() < qty) return false;
             }
 
-            // 2) Decrease stock (with rollback if anything fails)
+            // decrease stock (with rollback)
             List<CartItem> decreased = new ArrayList<>();
             for (CartItem item : items) {
                 Product p = item.getProduct();
@@ -244,41 +220,24 @@ public class StoreController {
 
                 boolean ok = p.decreaseStock(qty);
                 if (!ok) {
-                    // rollback
                     for (CartItem prev : decreased) {
-                        Product prevP = prev.getProduct();
-                        prevP.increaseStock(prev.getQuantity());
+                        prev.getProduct().increaseStock(prev.getQuantity());
                     }
                     return false;
                 }
                 decreased.add(item);
             }
 
-            // 3) Create order in engine (engine adds it to allOrders and clears cart)
-            // IMPORTANT: create order with the real customer username (not UNKNOWN)
+            // create order (includes username, clears cart, adds to engine history)
             Order order = engine.createOrderFromCustomer(customer);
-
             if (order == null) {
-                // rollback stock if engine failed to create order
                 for (CartItem item : decreased) {
-                    Product p = item.getProduct();
-                    p.increaseStock(item.getQuantity());
+                    item.getProduct().increaseStock(item.getQuantity());
                 }
                 return false;
             }
 
-            // 4) Add to customer's personal history
-            boolean added = customer.addOrder(order);
-            if (!added) {
-                // rollback stock to keep consistency
-                for (CartItem item : decreased) {
-                    Product p = item.getProduct();
-                    p.increaseStock(item.getQuantity());
-                }
-                return false;
-            }
-
-            // 5) Save order to file (IO is centralized and synchronized in OrderHistoryIO)
+            // persist
             OrderHistoryIO.appendOrder(order);
 
             return true;
@@ -290,38 +249,41 @@ public class StoreController {
     // ---------------------------------------------------------------------
 
     /**
-     * Adds a product to the customer's cart.
+     * Adds a product to the current customer's cart.
      *
-     * @param p        product to add
+     * @param product  product to add
      * @param quantity quantity to add
-     * @return true if added, false otherwise
+     * @return true if added; false otherwise
      */
-    public boolean addToCart(Product p, int quantity) {
+    public boolean addToCart(Product product, int quantity) {
+        if (customer == null) return false;
         synchronized (engine) {
-            return customer.addToCart(p, quantity);
+            return customer.addToCart(product, quantity);
         }
     }
 
     /**
-     * Returns current cart items.
+     * Returns current customer's cart items.
      *
      * @return list of cart items
      */
     public List<CartItem> getItems() {
+        if (customer == null) return new ArrayList<>();
         synchronized (engine) {
             return customer.getItems();
         }
     }
 
     /**
-     * Removes a product from the customer's cart.
+     * Removes a product from the current customer's cart.
      *
-     * @param p product to remove
-     * @return true if removed, false otherwise
+     * @param product product to remove
+     * @return true if removed; false otherwise
      */
-    public boolean removeFromCart(Product p) {
+    public boolean removeFromCart(Product product) {
+        if (customer == null) return false;
         synchronized (engine) {
-            return customer.removeFromCart(p);
+            return customer.removeFromCart(product);
         }
     }
 
@@ -332,7 +294,7 @@ public class StoreController {
     /**
      * Returns whether the current session has manager permissions.
      *
-     * @return true if manager mode is active, false otherwise
+     * @return true if manager mode is active; false otherwise
      */
     public boolean canManage() {
         return manager != null;
@@ -342,7 +304,7 @@ public class StoreController {
      * Adds a new product to the catalog (manager only).
      *
      * @param product product to add
-     * @return true if added, false otherwise
+     * @return true if added; false otherwise
      */
     public boolean addProduct(Product product) {
         if (!canManage() || product == null) return false;
@@ -358,7 +320,7 @@ public class StoreController {
      *
      * @param product product to update
      * @param amount  amount to increase (must be > 0)
-     * @return true if succeeded, false otherwise
+     * @return true if succeeded; false otherwise
      */
     public boolean increaseStock(Product product, int amount) {
         if (!canManage() || product == null || amount <= 0) return false;
@@ -374,7 +336,7 @@ public class StoreController {
      *
      * @param product product to update
      * @param amount  amount to decrease (must be > 0)
-     * @return true if succeeded, false otherwise
+     * @return true if succeeded; false otherwise
      */
     public boolean decreaseStock(Product product, int amount) {
         if (!canManage() || product == null || amount <= 0) return false;

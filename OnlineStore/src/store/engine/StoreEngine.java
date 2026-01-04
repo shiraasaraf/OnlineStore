@@ -14,32 +14,31 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Central engine of the store system.
+ * Central engine of the store system (Singleton).
  * <p>
- * Manages products, customers and orders.
- * Implemented as a Singleton.
+ * Holds the shared application state: products, customers, and orders.
+ * This class does not perform file I/O; persistence is handled by store.io classes.
  * </p>
- *
  * <p>
- * Note (MVC): This class does NOT handle file I/O. File operations are done in store.io classes.
- * Thread-safety is handled by the Controller by synchronizing on the shared engine instance.
+ * Thread-safety: the controller synchronizes on the shared engine instance
+ * when performing critical operations.
  * </p>
  */
 public class StoreEngine {
 
     /** Singleton instance. */
-    private static StoreEngine instance = null;
+    private static StoreEngine instance;
 
-    /** Store products. */
+    /** All products in the store. */
     private final List<Product> products;
 
-    /** All orders created in the system. */
+    /** All orders created/loaded in the system. */
     private final List<Order> allOrders;
 
-    /** Registered customers. */
+    /** Registered customers (optional, used for simple username-based separation). */
     private final List<Customer> customers;
 
-    /** Order ID generator. */
+    /** Order ID generator (monotonically increases). */
     private static int nextOrderId = 0;
 
     /**
@@ -54,7 +53,7 @@ public class StoreEngine {
     /**
      * Returns the singleton instance of the store engine.
      *
-     * @return store engine instance
+     * @return shared store engine instance
      */
     public static StoreEngine getInstance() {
         if (instance == null) {
@@ -63,72 +62,112 @@ public class StoreEngine {
         return instance;
     }
 
-    // ------------------------------------------------------------------------
-    // Product Management
-    // ------------------------------------------------------------------------
+    // ---------------------------------------------------------------------
+    // Product management
+    // ---------------------------------------------------------------------
 
-    public void addProduct(Product p) {
-        if (p == null) return;
+    /**
+     * Adds a product to the catalog.
+     * <p>
+     * If a product with the same name already exists, stock is increased
+     * by the new product's stock amount.
+     * </p>
+     *
+     * @param product product to add
+     */
+    public void addProduct(Product product) {
+        if (product == null) {
+            return;
+        }
 
-        Product existing = findProductByName(p.getName());
-
+        Product existing = findProductByName(product.getName());
         if (existing != null) {
-            int amountToAdd = p.getStock();
+            int amountToAdd = product.getStock();
             if (amountToAdd > 0) {
                 existing.increaseStock(amountToAdd);
             }
         } else {
-            products.add(p);
+            products.add(product);
         }
     }
 
+    /**
+     * Returns products that are currently in stock.
+     *
+     * @return list of products with stock &gt; 0
+     */
     public List<Product> getAvailableProducts() {
         List<Product> available = new ArrayList<>();
         for (Product p : products) {
-            if (p.getStock() > 0) {
+            if (p != null && p.getStock() > 0) {
                 available.add(p);
             }
         }
         return available;
     }
 
+    /**
+     * Returns a defensive copy of all products in the catalog (including out-of-stock products).
+     *
+     * @return copy of products list
+     */
     public List<Product> getAllProducts() {
         return new ArrayList<>(products);
     }
 
+    /**
+     * Removes a product from the catalog.
+     *
+     * @param product product to remove
+     * @return true if removed; false otherwise
+     */
     public boolean removeProduct(Product product) {
-        if (product == null) return false;
+        if (product == null) {
+            return false;
+        }
         return products.remove(product);
     }
 
-    // ------------------------------------------------------------------------
-    // Customer Management
-    // ------------------------------------------------------------------------
+    // ---------------------------------------------------------------------
+    // Customer management
+    // ---------------------------------------------------------------------
 
-    public boolean registerCustomer(Customer c) {
-        if (c == null) return false;
+    /**
+     * Registers a customer (by username uniqueness).
+     *
+     * @param customer customer to register
+     * @return true if registered; false if null or username already exists
+     */
+    public boolean registerCustomer(Customer customer) {
+        if (customer == null) {
+            return false;
+        }
 
         for (Customer existing : customers) {
-            if (existing.getUsername().equals(c.getUsername())) {
+            if (existing != null && existing.getUsername() != null
+                    && existing.getUsername().equals(customer.getUsername())) {
                 return false;
             }
         }
 
-        customers.add(c);
+        customers.add(customer);
         return true;
     }
 
     /**
-     * Finds an already-registered customer by username.
-     * Useful for "login" without passwords (simple separation between customers).
+     * Finds a registered customer by username (case-insensitive).
      *
      * @param username customer's username
-     * @return matching customer or null
+     * @return matching customer or null if not found/invalid input
      */
     public Customer findCustomerByUsername(String username) {
-        if (username == null) return null;
+        if (username == null) {
+            return null;
+        }
         String u = username.trim();
-        if (u.isEmpty()) return null;
+        if (u.isEmpty()) {
+            return null;
+        }
 
         for (Customer c : customers) {
             if (c != null && c.getUsername() != null && c.getUsername().equalsIgnoreCase(u)) {
@@ -139,30 +178,40 @@ public class StoreEngine {
     }
 
     /**
-     * Returns a copy of all registered customers.
+     * Returns a defensive copy of all registered customers.
+     *
+     * @return copy of customers list
      */
     public List<Customer> getCustomers() {
         return new ArrayList<>(customers);
     }
 
-    // ------------------------------------------------------------------------
-    // Order Management
-    // ------------------------------------------------------------------------
+    // ---------------------------------------------------------------------
+    // Order management
+    // ---------------------------------------------------------------------
 
+    /**
+     * Returns a defensive copy of all orders in the system.
+     *
+     * @return copy of orders list
+     */
     public List<Order> getAllOrders() {
         return new ArrayList<>(allOrders);
     }
 
     /**
-     * NEW (recommended): Creates an order from the given customer.
-     * The cart is cleared after successful creation.
-     * The order will include the customer's username, so order-history can be filtered per customer.
+     * Creates an order from the given customer's cart.
+     * <p>
+     * The created order includes the customer's username and the cart is cleared.
+     * </p>
      *
-     * @param customer the customer who performs checkout
-     * @return created order, or null if failed
+     * @param customer customer who performs checkout
+     * @return created order, or null if customer/cart invalid or empty
      */
     public Order createOrderFromCustomer(Customer customer) {
-        if (customer == null) return null;
+        if (customer == null) {
+            return null;
+        }
 
         Cart cart = customer.getCart();
         if (cart == null || cart.isEmpty()) {
@@ -185,13 +234,12 @@ public class StoreEngine {
     }
 
     /**
-     * Backward-compatible method (existing code can keep using it),
-     * but it will create orders with UNKNOWN customer.
-     *
-     * Prefer {@link #createOrderFromCustomer(Customer)} for correct history separation.
+     * Creates an order from a cart without customer identity.
+     * Prefer {@link #createOrderFromCustomer(Customer)} when possible.
      *
      * @param cart shopping cart
-     * @return created order, or null if failed
+     * @return created order, or null if cart is invalid or empty
+     * @deprecated use {@link #createOrderFromCustomer(Customer)} to keep customer separation
      */
     @Deprecated
     public Order createOrderFromCart(Cart cart) {
@@ -214,32 +262,37 @@ public class StoreEngine {
     }
 
     /**
-     * Adds loaded orders into the engine (used on startup).
-     * Also updates the nextOrderId so new orders will get unique IDs.
+     * Adds orders loaded from persistent storage into the engine and updates the next order ID.
      *
-     * @param orders orders loaded from file
+     * @param orders loaded orders
      */
     public void addLoadedOrders(List<Order> orders) {
-        if (orders == null || orders.isEmpty()) return;
+        if (orders == null || orders.isEmpty()) {
+            return;
+        }
 
         for (Order o : orders) {
             if (o == null) continue;
+
             allOrders.add(o);
+
             if (o.getOrderID() > nextOrderId) {
                 nextOrderId = o.getOrderID();
             }
         }
     }
 
-    // ------------------------------------------------------------------------
+    // ---------------------------------------------------------------------
     // Helpers
-    // ------------------------------------------------------------------------
+    // ---------------------------------------------------------------------
 
     private Product findProductByName(String name) {
-        if (name == null) return null;
+        if (name == null) {
+            return null;
+        }
 
         for (Product p : products) {
-            if (p.getName() != null && p.getName().equalsIgnoreCase(name)) {
+            if (p != null && p.getName() != null && p.getName().equalsIgnoreCase(name)) {
                 return p;
             }
         }
@@ -247,8 +300,8 @@ public class StoreEngine {
     }
 
     /**
-     * Public product lookup by name.
-     * Used by IO utilities to resolve products when loading orders.
+     * Looks up a product by name.
+     * Used by I/O utilities to resolve products when loading orders.
      *
      * @param name product name
      * @return matching product or null
