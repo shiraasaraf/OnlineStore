@@ -2,5 +2,5 @@ name,price,stock,description,category,imagePath
 Laptop,3500.00,5,14 inch laptop,ELECTRONICS,images/electronics/laptop_silver.jpg
 Phone,2500.00,8,Android phone,ELECTRONICS,images/electronics/smartphone.jpg
 Harry Potter,80.70,12,A thriller fiction book for young adults,BOOKS,images/books/HarryPotter.jpg
-T-Shirt,59.00,1,Cotton shirt,CLOTHING,images/clothing/tshirt_red.jpg
+T-Shirt,59.00,4,Cotton shirt,CLOTHING,images/clothing/tshirt_red.jpg
 HeadPhones,29.00,3,Wireless headphones bluetooth 5.3 Extra-bass Audio 70H playtime battery,ELECTRONICS,images/electronics/headphones_white.jpg

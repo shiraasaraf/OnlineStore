@@ -388,8 +388,12 @@ public class StoreWindow extends JFrame {
 
         cartPanel.addRemoveItemListener(ev -> {
             JButton btn = (JButton) ev.getSource();
-            Product p = (Product) btn.getClientProperty("product");
-            if (p == null) return;
+            // CartPanel stores the CartItem on the remove button (CartPanel.PROP_CART_ITEM)
+            // so we retrieve it and then extract the product.
+            CartItem item = (CartItem) btn.getClientProperty(CartPanel.PROP_CART_ITEM);
+            if (item == null || item.getProduct() == null) return;
+
+            Product p = item.getProduct();
 
             worker.runAsync(
                     () -> {

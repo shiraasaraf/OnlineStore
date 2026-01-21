@@ -72,7 +72,8 @@ public class Customer extends User {
     /**
      * Adds a product to the cart.
      * <p>
-     * This method performs basic validation and checks that current stock is sufficient.
+     * This method performs basic validation and checks that total quantity in cart
+     * will not exceed current stock.
      * Stock is not decreased here; stock changes happen only during checkout.
      * </p>
      *
@@ -84,9 +85,28 @@ public class Customer extends User {
         if (product == null || quantity <= 0) {
             return false;
         }
-        if (product.getStock() < quantity) {
+
+        int stock = product.getStock();
+        if (stock <= 0) {
             return false;
         }
+
+        // Sum how many units of this product already exist in the cart
+        int alreadyInCart = 0;
+        for (CartItem item : cart.getItems()) {
+            if (item == null) continue;
+
+            Product p = item.getProduct();
+            if (p != null && p.equals(product)) {
+                alreadyInCart += item.getQuantity();
+            }
+        }
+
+        // Block if the new total would exceed stock
+        if (alreadyInCart + quantity > stock) {
+            return false;
+        }
+
         return cart.addItem(product, quantity);
     }
 
