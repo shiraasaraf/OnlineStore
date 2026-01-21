@@ -3,7 +3,6 @@
  * Tamar Nahum, ID 021983812
  * Shira Asaraf, ID 322218439
  */
-
 package store.gui.view;
 
 import store.gui.controller.StoreController;
@@ -16,18 +15,51 @@ import store.products.Product;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ActionEvent;
+import java.awt.event.WindowAdapter;
+import java.awt.event.WindowEvent;
 import java.io.File;
 import java.io.IOException;
 import java.util.List;
 
 /**
- * Dialog window for catalog / inventory management (Manager).
- * Supports: delete product, increase/decrease stock, add new product.
- * After every successful change, the catalog is saved to a default CSV file.
+ * CatalogManagementWindow is a manager-only dialog for catalog / inventory management.
+ *
+ * <p>
+ * Supported operations:
+ * </p>
+ * <ul>
+ *   <li>Delete a product</li>
+ *   <li>Increase / decrease stock for a product</li>
+ *   <li>Add a new product</li>
+ * </ul>
+ *
+ * <p>
+ * Singleton (dialog-level):
+ * The dialog is opened via {@link #open(StoreWindow, StoreController)} and guarantees that only one
+ * dialog instance exists at any given time. If {@code open(...)} is called while the dialog is already
+ * open, the existing dialog is brought to the front (no new instance is created).
+ * </p>
+ *
+ * <p>
+ * Persistence rule:
+ * After every successful catalog change, the catalog is saved to a default CSV file.
+ * </p>
  */
 public class CatalogManagementWindow extends JDialog {
 
+    // -------------------------------------------------------------------------
+    // Static / Constants
+    // -------------------------------------------------------------------------
+
+    /** Singleton instance of the catalog management dialog. */
+    private static CatalogManagementWindow instance;
+
+    /** Default file used to persist the catalog after successful changes. */
     private static final File DEFAULT_CATALOG_FILE = new File("products_catalog.csv");
+
+    // -------------------------------------------------------------------------
+    // Data members (fields)
+    // -------------------------------------------------------------------------
 
     private final StoreController controller;
     private final StoreWindow parentWindow;
@@ -43,26 +75,91 @@ public class CatalogManagementWindow extends JDialog {
 
     private final JSpinner stockSpinner;
 
+    // -------------------------------------------------------------------------
+    // Singleton open (Dialog-level Singleton)
+    // -------------------------------------------------------------------------
+
+    /**
+     * Opens the catalog management dialog as a Singleton.
+     * <p>
+     * Important behavior:
+     * </p>
+     * <ul>
+     *   <li>No additional dialog instances are created while one already exists.</li>
+     *   <li>If the dialog is already open, it is brought to the front (instead of opening a new one).</li>
+     *   <li>When the dialog is closed, the singleton reference is cleared so it can be opened again.</li>
+     * </ul>
+     *
+     * @param parentWindow parent {@link StoreWindow} for positioning/ownership
+     * @param controller   controller used to perform catalog operations
+     * @throws IllegalArgumentException if {@code parentWindow} or {@code controller} is {@code null}
+     */
+    public static void open(StoreWindow parentWindow, StoreController controller) {
+        if (parentWindow == null) {
+            throw new IllegalArgumentException("parentWindow cannot be null");
+        }
+        if (controller == null) {
+            throw new IllegalArgumentException("controller cannot be null");
+        }
+
+        // If it was disposed (or never created) - create a fresh dialog instance.
+        if (instance == null || !instance.isDisplayable()) {
+            instance = new CatalogManagementWindow(parentWindow, controller);
+
+            // When closed, clear the singleton reference to allow reopening later.
+            instance.addWindowListener(new WindowAdapter() {
+                @Override
+                public void windowClosed(WindowEvent e) {
+                    instance = null;
+                }
+
+                @Override
+                public void windowClosing(WindowEvent e) {
+                    instance = null;
+                }
+            });
+        } else {
+            // Dialog already exists:
+            // DO NOT create a new instance; bring the existing dialog to the front.
+            instance.setLocationRelativeTo(parentWindow);
+            instance.setVisible(true);
+            instance.toFront();
+            instance.requestFocus();
+
+            // Helps on Windows in cases where toFront() is not enough.
+            instance.setAlwaysOnTop(true);
+            instance.setAlwaysOnTop(false);
+        }
+
+        instance.setVisible(true);
+    }
+
+    // -------------------------------------------------------------------------
+    // Constructor
+    // -------------------------------------------------------------------------
+
     /**
      * Constructs the catalog / inventory management dialog.
      * <p>
-     * This dialog is available to managers only and provides functionality for:
-     * deleting products, increasing or decreasing stock levels, and adding new
-     * products to the catalog. The dialog displays the current product list and
-     * allows performing management operations via the {@link StoreController}.
-     * </p>
-     * <p>
-     * If the current user does not have manager permissions, an error message is
-     * shown and the dialog is closed immediately.
+     * This dialog is intended for managers only. If the current user does not have manager
+     * permissions, an error is shown and an {@link IllegalStateException} is thrown.
      * </p>
      *
      * @param parentWindow the parent {@link StoreWindow} that owns this dialog
      * @param controller   the store controller used to perform catalog operations
      *
+     * @throws IllegalArgumentException if {@code parentWindow} or {@code controller} is {@code null}
      * @throws IllegalStateException if the user does not have manager permissions
      */
     public CatalogManagementWindow(StoreWindow parentWindow, StoreController controller) {
         super(parentWindow, "Catalog / Inventory Management", true);
+
+        if (parentWindow == null) {
+            throw new IllegalArgumentException("parentWindow cannot be null");
+        }
+        if (controller == null) {
+            throw new IllegalArgumentException("controller cannot be null");
+        }
 
         this.controller = controller;
         this.parentWindow = parentWindow;
@@ -82,17 +179,10 @@ public class CatalogManagementWindow extends JDialog {
         setLocationRelativeTo(parentWindow);
         setLayout(new BorderLayout(10, 10));
 
+        // CENTER: Product list
         listModel = new DefaultListModel<>();
         productList = new JList<>(listModel);
         productList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
-
-        /**
-         * Custom list cell renderer for displaying product details in the catalog list.
-         * <p>
-         * Each list entry shows the product name, category, price, and current
-         * stock amount in a readable single-line format.
-         * </p>
-         */
         productList.setCellRenderer(new DefaultListCellRenderer() {
             @Override
             public Component getListCellRendererComponent(JList<?> list,
@@ -115,9 +205,9 @@ public class CatalogManagementWindow extends JDialog {
                 return label;
             }
         });
-
         add(new JScrollPane(productList), BorderLayout.CENTER);
 
+        // EAST: Stock controls + buttons
         JPanel rightPanel = new JPanel();
         rightPanel.setLayout(new BoxLayout(rightPanel, BoxLayout.Y_AXIS));
         rightPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
@@ -142,17 +232,19 @@ public class CatalogManagementWindow extends JDialog {
 
         add(rightPanel, BorderLayout.EAST);
 
+        // SOUTH: Delete + Close
         removeButton = new JButton("Delete selected product");
         closeButton = new JButton("Close");
 
         JPanel bottomPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
         bottomPanel.add(removeButton);
         bottomPanel.add(closeButton);
-
         add(bottomPanel, BorderLayout.SOUTH);
 
+        // Initial data
         refreshProductList();
 
+        // Wiring
         removeButton.addActionListener(this::onRemoveClicked);
         increaseStockButton.addActionListener(this::onIncreaseStock);
         decreaseStockButton.addActionListener(this::onDecreaseStock);
@@ -160,14 +252,12 @@ public class CatalogManagementWindow extends JDialog {
         closeButton.addActionListener(e -> dispose());
     }
 
+    // -------------------------------------------------------------------------
+    // Helpers
+    // -------------------------------------------------------------------------
+
     /**
      * Reloads the product list displayed in this management dialog.
-     * <p>
-     * Clears the current list model and repopulates it with all products
-     * retrieved from the {@link StoreController}. This method reflects the
-     * current state of the catalog and should be called after any catalog
-     * modification.
-     * </p>
      */
     private void refreshProductList() {
         listModel.clear();
@@ -178,15 +268,7 @@ public class CatalogManagementWindow extends JDialog {
     }
 
     /**
-     * Retrieves the stock change amount from the stock spinner.
-     * <p>
-     * The spinner value is expected to be a positive number. This method safely
-     * converts the spinner value to an integer, handling different numeric types.
-     * If the value cannot be interpreted as a number, a default value of {@code 1}
-     * is returned.
-     * </p>
-     *
-     * @return the stock change amount as an integer (minimum of 1)
+     * @return stock delta (minimum 1) from the spinner
      */
     private int getStockDelta() {
         Object v = stockSpinner.getValue();
@@ -196,14 +278,7 @@ public class CatalogManagementWindow extends JDialog {
     }
 
     /**
-     * Retrieves the currently selected product from the product list.
-     * <p>
-     * If no product is selected, a warning dialog is shown to the user and
-     * {@code null} is returned. This method is typically used by action
-     * handlers that require a selected product in order to proceed.
-     * </p>
-     *
-     * @return the selected {@link Product}, or {@code null} if no selection exists
+     * @return selected product, or {@code null} after showing a warning dialog if none is selected
      */
     private Product getSelectedOrWarn() {
         Product selected = productList.getSelectedValue();
@@ -219,12 +294,7 @@ public class CatalogManagementWindow extends JDialog {
     }
 
     /**
-     * Refreshes all relevant UI components after a catalog change.
-     * <p>
-     * Updates the product list displayed in this management dialog and
-     * notifies the parent {@link StoreWindow} to refresh its catalog view,
-     * ensuring that all open views reflect the most recent catalog state.
-     * </p>
+     * Refreshes both this dialog and the parent {@link StoreWindow} after a catalog change.
      */
     private void refreshEverywhere() {
         refreshProductList();
@@ -248,21 +318,10 @@ public class CatalogManagementWindow extends JDialog {
         }
     }
 
-    /**
-     * Handles the "Delete selected product" button action.
-     * <p>
-     * Attempts to remove the currently selected product from the catalog.
-     * If no product is selected, a warning is shown and the operation is aborted.
-     * Before deletion, a confirmation dialog is displayed to prevent accidental
-     * removal. If the removal operation fails, an error message is shown.
-     * </p>
-     * <p>
-     * After a successful removal, the catalog is saved to the default CSV file
-     * and all relevant UI views are refreshed.
-     * </p>
-     *
-     * @param e the action event fired by the "Delete selected product" button
-     */
+    // -------------------------------------------------------------------------
+    // Action handlers
+    // -------------------------------------------------------------------------
+
     private void onRemoveClicked(ActionEvent e) {
         Product selected = getSelectedOrWarn();
         if (selected == null) return;
@@ -285,22 +344,6 @@ public class CatalogManagementWindow extends JDialog {
         refreshEverywhere();
     }
 
-
-    /**
-     * Handles the "Increase Stock" button action.
-     * <p>
-     * Increases the stock of the currently selected product by the amount specified
-     * in the stock spinner. If no product is selected, a warning is shown and the
-     * operation is aborted. If the increase operation fails, an error message is
-     * displayed.
-     * </p>
-     * <p>
-     * After a successful stock update, the catalog is saved to the default CSV file
-     * and all relevant UI views are refreshed.
-     * </p>
-     *
-     * @param e the action event fired by the "Increase Stock" button
-     */
     private void onIncreaseStock(ActionEvent e) {
         Product selected = getSelectedOrWarn();
         if (selected == null) return;
@@ -316,21 +359,6 @@ public class CatalogManagementWindow extends JDialog {
         refreshEverywhere();
     }
 
-    /**
-     * Handles the "Decrease Stock" button action.
-     * <p>
-     * Decreases the stock of the currently selected product by the amount specified
-     * in the stock spinner. If no product is selected, a warning is shown and the
-     * operation is aborted. If the decrease operation fails (for example, due to
-     * insufficient stock), an error message is displayed.
-     * </p>
-     * <p>
-     * After a successful stock update, the catalog is saved to the default CSV file
-     * and all relevant UI views are refreshed.
-     * </p>
-     *
-     * @param e the action event fired by the "Decrease Stock" button
-     */
     private void onDecreaseStock(ActionEvent e) {
         Product selected = getSelectedOrWarn();
         if (selected == null) return;
@@ -351,17 +379,6 @@ public class CatalogManagementWindow extends JDialog {
         refreshEverywhere();
     }
 
-    /**
-     * Handles the "Add New Product" button action.
-     * <p>
-     * Opens the add-product dialog, validates the user input (inside the dialog),
-     * and if a product was created successfully, requests the controller to add it
-     * to the catalog. After a successful add, the catalog is saved to the default
-     * CSV file and the UI is refreshed (both this list and the parent window view).
-     * </p>
-     *
-     * @param e the action event fired by the "Add New Product" button
-     */
     private void onAddProduct(ActionEvent e) {
         Product newProduct = showAddProductDialog();
         if (newProduct == null) return;
@@ -376,13 +393,19 @@ public class CatalogManagementWindow extends JDialog {
         refreshEverywhere();
     }
 
-
+    // -------------------------------------------------------------------------
+    // Add-product dialog (will be refactored later to Factory+Builder)
+    // -------------------------------------------------------------------------
 
     /**
-     * Creates a concrete product instance based on the selected Category:
-     * BOOKS -> BookProduct, CLOTHING -> ClothingProduct, ELECTRONICS -> ElectronicsProduct.
+     * Creates a concrete product instance based on the selected {@link Category}.
      *
-     * @return created product or null if cancelled/invalid
+     * <p>
+     * Current implementation uses concrete constructors:
+     * BOOKS -> {@link BookProduct}, CLOTHING -> {@link ClothingProduct}, ELECTRONICS -> {@link ElectronicsProduct}.
+     * </p>
+     *
+     * @return created product or {@code null} if cancelled/invalid
      */
     private Product showAddProductDialog() {
 
@@ -539,13 +562,11 @@ public class CatalogManagementWindow extends JDialog {
             return null;
         }
 
-        // Image path is mandatory
         if (img.isEmpty()) {
             JOptionPane.showMessageDialog(this, "Image path is required.", "Validation", JOptionPane.WARNING_MESSAGE);
             return null;
         }
 
-        // Enforce resources/images path format
         if (!(img.startsWith("images/") || img.startsWith("images\\"))) {
             JOptionPane.showMessageDialog(
                     this,
@@ -615,7 +636,6 @@ public class CatalogManagementWindow extends JDialog {
             return new ClothingProduct(name, price, stock, desc, cat, color, img, size);
         }
 
-        // ELECTRONICS
         String warrantyText = warrantyField.getText() == null ? "" : warrantyField.getText().trim();
         String brand = brandField.getText() == null ? "" : brandField.getText().trim();
 
@@ -638,6 +658,4 @@ public class CatalogManagementWindow extends JDialog {
 
         return new ElectronicsProduct(name, price, stock, desc, cat, color, img, warrantyMonths, brand);
     }
-
-
 }

@@ -12,26 +12,35 @@ import store.gui.controller.StoreController;
 
 import javax.swing.*;
 import java.awt.*;
-import java.awt.event.WindowAdapter;
-import java.awt.event.WindowEvent;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * Launcher window that opens Customer and Manager store windows.
+ * LauncherWindow is the entry point of the GUI.
+ *
  * <p>
- * The launcher acts as the entry point to the GUI: it allows opening multiple
- * customer windows and a single manager window. All opened windows share the
- * same {@link StoreEngine} instance, so changes performed by one window (e.g.,
- * purchases or inventory updates) are reflected across all other windows after refresh.
+ * It allows opening:
  * </p>
+ * <ul>
+ *   <li>Multiple <b>Customer</b> store windows (each customer gets its own {@link StoreController}).</li>
+ *   <li>A single <b>Manager</b> store window (Singleton) via {@link StoreWindow#openManagerWindow(StoreController)}.</li>
+ * </ul>
+ *
  * <p>
- * Note: This class does not load order history by itself. Any loading of persisted
- * data (catalog/orders) should be performed by the application startup code before
- * creating this window, or inside the {@link StoreEngine}/{@link StoreController}
- * initialization if implemented there.
+ * All opened windows share the same {@link StoreEngine} instance, so changes performed by one window
+ * (e.g., purchases or inventory updates) are reflected across all other windows after refresh.
+ * </p>
+ *
+ * <p>
+ * Note: This class does not load persisted data by itself. Any loading of persisted catalog/orders
+ * should be performed by the application startup code before creating this window, or inside the
+ * {@link StoreEngine}/{@link StoreController} initialization if implemented there.
  * </p>
  */
 public class LauncherWindow extends JFrame {
+
+    // -------------------------------------------------------------------------
+    // Fields
+    // -------------------------------------------------------------------------
 
     /** Shared store engine instance used by all windows. */
     private final StoreEngine engine;
@@ -39,22 +48,25 @@ public class LauncherWindow extends JFrame {
     /** Opens a new customer window. */
     private final JButton openCustomerButton = new JButton("Open Customer window");
 
-    /** Opens the manager window (only one may be open at a time). */
+    /**
+     * Opens the manager window.
+     * <p>
+     * The manager window is managed as a Singleton by {@link StoreWindow#openManagerWindow(StoreController)}:
+     * clicking this button multiple times must not create multiple manager windows; instead,
+     * the existing manager window is brought to the front.
+     * </p>
+     */
     private final JButton openManagerButton = new JButton("Open Manager window");
 
     /** Counter used to generate unique default guest usernames. */
     private final AtomicInteger customerCounter = new AtomicInteger(1);
 
-    /** True while a manager window is open, to prevent opening multiple manager windows. */
-    private boolean managerWindowOpen = false;
+    // -------------------------------------------------------------------------
+    // Constructor
+    // -------------------------------------------------------------------------
 
     /**
      * Constructs the launcher window.
-     * <p>
-     * This window provides two actions: opening a customer store window and opening
-     * a manager store window. Customer windows can be opened multiple times, while
-     * the manager window is restricted to a single instance at a time.
-     * </p>
      *
      * @param engine the shared store engine used by all opened windows
      * @throws IllegalArgumentException if {@code engine} is {@code null}
@@ -82,6 +94,10 @@ public class LauncherWindow extends JFrame {
 
         add(panel, BorderLayout.CENTER);
     }
+
+    // -------------------------------------------------------------------------
+    // Customer flow
+    // -------------------------------------------------------------------------
 
     /**
      * Opens a new customer store window.
@@ -148,52 +164,26 @@ public class LauncherWindow extends JFrame {
         }
     }
 
+    // -------------------------------------------------------------------------
+    // Manager flow (Singleton)
+    // -------------------------------------------------------------------------
+
     /**
-     * Opens the manager store window.
+     * Opens the manager store window using the Manager GUI Singleton.
      * <p>
-     * Only one manager window may be open at a time. While it is open, the
-     * "Open Manager window" button is disabled. When the manager window is closed,
-     * the button is re-enabled and another manager window may be opened.
+     * This method intentionally does <b>not</b> disable the "Open Manager window" button.
+     * Instead, it delegates to {@link StoreWindow#openManagerWindow(StoreController)} which ensures:
      * </p>
+     * <ul>
+     *   <li>No additional manager windows are created while one already exists.</li>
+     *   <li>If the manager window is already open, it is brought to the front.</li>
+     * </ul>
      */
     private void openManagerWindow() {
-        if (managerWindowOpen) {
-            JOptionPane.showMessageDialog(
-                    this,
-                    "Manager window is already open.",
-                    "Info",
-                    JOptionPane.INFORMATION_MESSAGE
-            );
-            return;
-        }
-
-        managerWindowOpen = true;
-        openManagerButton.setEnabled(false);
-
         Customer customer = new Customer("Admin", "");
         Manager manager = new Manager("Admin", "");
-
         StoreController controller = new StoreController(engine, customer, manager);
 
-        StoreWindow window = new StoreWindow(controller);
-        window.setTitle("Online Store - Manager");
-        window.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
-
-        /**
-         * Tracks the manager window lifecycle.
-         * <p>
-         * When the manager window is closed, this listener clears the "manager open"
-         * flag and re-enables the manager button in the launcher.
-         * </p>
-         */
-        window.addWindowListener(new WindowAdapter() {
-            @Override
-            public void windowClosed(WindowEvent e) {
-                managerWindowOpen = false;
-                openManagerButton.setEnabled(true);
-            }
-        });
-
-        window.setVisible(true);
+        StoreWindow.openManagerWindow(controller);
     }
 }

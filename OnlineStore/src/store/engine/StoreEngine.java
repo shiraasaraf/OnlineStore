@@ -27,7 +27,7 @@ import java.util.List;
 public class StoreEngine {
 
     /** Singleton instance. */
-    private static StoreEngine instance;
+    private static volatile StoreEngine instance;
 
     /** All products in the store. */
     private final List<Product> products;
@@ -57,10 +57,15 @@ public class StoreEngine {
      */
     public static StoreEngine getInstance() {
         if (instance == null) {
-            instance = new StoreEngine();
+            synchronized (StoreEngine.class) {
+                if (instance == null) {
+                    instance = new StoreEngine();
+                }
+            }
         }
         return instance;
     }
+
 
     // ---------------------------------------------------------------------
     // Product management

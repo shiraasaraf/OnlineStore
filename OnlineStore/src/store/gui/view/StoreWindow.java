@@ -3,7 +3,6 @@
  * Tamar Nahum, ID 021983812
  * Shira Asaraf, ID 322218439
  */
-
 package store.gui.view;
 
 import store.cart.CartItem;
@@ -23,25 +22,24 @@ import java.io.IOException;
 import java.util.List;
 
 /**
- * Main store window for displaying and interacting with the product catalog.
+ * StoreWindow represents the main GUI window of the online store.
+ *
  * <p>
- * This window is role-aware:
+ * Role-aware UI:
  * </p>
  * <ul>
- *   <li><b>Customer</b>: sees the catalog grid and also a right-side panel containing
+ *   <li><b>Customer</b>: sees the catalog grid and a right-side panel containing
  *       {@link ProductDetailsPanel} and {@link CartPanel}.</li>
  *   <li><b>Manager</b>: sees the catalog grid and manager actions (load/save/manage catalog),
  *       but does not see the right-side customer panel.</li>
  * </ul>
  *
  * <p>
- * UI behavior rules:
+ * Manager GUI (Singleton):
+ * This class provides a single manager window instance via
+ * {@link #openManagerWindow(StoreController)}. If the manager window is already open,
+ * calling this method brings the existing window to the front instead of creating a new one.
  * </p>
- * <ul>
- *   <li>Filters (Search + Category) are always visible for both Customer and Manager.</li>
- *   <li>Action buttons are role-based: customers see only customer actions, managers see manager actions.</li>
- *   <li>The catalog grid shows all products, including products with stock {@code 0}.</li>
- * </ul>
  *
  * <p>
  * Threading:
@@ -51,14 +49,73 @@ import java.util.List;
  */
 public class StoreWindow extends JFrame {
 
+    // -------------------------------------------------------------------------
+    // Singleton (Manager GUI)
+    // -------------------------------------------------------------------------
+
+    /** Singleton instance for the manager window (Manager GUI). */
+    private static StoreWindow managerInstance;
+
+    /**
+     * Opens the manager store window as a Singleton.
+     * <p>
+     * Important behavior for the assignment requirement:
+     * </p>
+     * <ul>
+     *   <li>No additional manager window instances are created while one already exists.</li>
+     *   <li>If the manager window is already open, it is brought to the front (instead of opening a new one).</li>
+     *   <li>When the manager window is closed, the singleton reference is cleared, allowing reopening later.</li>
+     * </ul>
+     *
+     * @param controller controller configured for a manager session
+     * @throws IllegalArgumentException if {@code controller} is {@code null}
+     */
+    public static void openManagerWindow(StoreController controller) {
+        if (controller == null) {
+            throw new IllegalArgumentException("controller cannot be null");
+        }
+
+        // If there is no existing instance (or it was disposed), create a new one.
+        if (managerInstance == null || !managerInstance.isDisplayable()) {
+            managerInstance = new StoreWindow(controller);
+            managerInstance.setTitle("Online Store - Manager");
+            managerInstance.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
+
+            // When the manager window closes, clear the singleton reference,
+            // so future calls can create a fresh instance.
+            managerInstance.addWindowListener(new WindowAdapter() {
+                @Override
+                public void windowClosed(WindowEvent e) {
+                    managerInstance = null;
+                }
+            });
+        } else {
+            // Manager window already exists:
+            // DO NOT create another instance; bring the existing window to the front.
+            managerInstance.setVisible(true);
+            managerInstance.toFront();
+            managerInstance.requestFocus();
+
+            // Helps on Windows in cases where toFront() is not enough.
+            managerInstance.setAlwaysOnTop(true);
+            managerInstance.setAlwaysOnTop(false);
+        }
+
+        managerInstance.setVisible(true);
+    }
+
+    // -------------------------------------------------------------------------
+    // Fields
+    // -------------------------------------------------------------------------
+
     /** Background worker used to run slow tasks off the Swing EDT. */
     private final WindowWorker worker;
 
-    /** Catalog grid panel (center area). */
-    private final JPanel catalogPanel;
-
     /** Controller used to access model operations. */
     private final StoreController controller;
+
+    /** Catalog grid panel (center area). */
+    private final JPanel catalogPanel;
 
     /** Panel that displays selected product details (customer only; {@code null} for manager). */
     private ProductDetailsPanel detailsPanel;
@@ -88,6 +145,10 @@ public class StoreWindow extends JFrame {
     /** Category filter combo box ("All" + categories) (always visible). */
     private final JComboBox<Object> categoryCombo = new JComboBox<>();
 
+    // -------------------------------------------------------------------------
+    // Constructor
+    // -------------------------------------------------------------------------
+
     /**
      * Constructs the main store window.
      * <p>
@@ -111,10 +172,8 @@ public class StoreWindow extends JFrame {
         String roleName = controller.canManage() ? "Manager" : "Customer";
         this.worker = new WindowWorker(roleName + "-WindowWorker-" + System.identityHashCode(this));
 
-        /**
-         * Ensures resources are released when the window is closed.
-         * Closes the associated {@link WindowWorker} and disposes the frame.
-         */
+        // Ensures resources are released when the window is closed.
+        // Closes the associated WindowWorker and disposes the frame.
         addWindowListener(new WindowAdapter() {
             @Override
             public void windowClosed(WindowEvent e) {
@@ -281,13 +340,12 @@ public class StoreWindow extends JFrame {
      * Wires action buttons to their handlers.
      * <p>
      * File operations (load/save) are executed asynchronously via {@link WindowWorker}
-     * to avoid blocking the Swing EDT. After successful load/save, the UI is updated
-     * and a status dialog is shown.
+     * to avoid blocking the Swing EDT.
      * </p>
      */
     private void wireActions() {
 
-        // Load products (manager only button exists only in manager UI)
+        // Load products (manager only)
         loadButton.addActionListener(e -> {
             JFileChooser chooser = new JFileChooser();
             int result = chooser.showOpenDialog(this);
@@ -356,8 +414,7 @@ public class StoreWindow extends JFrame {
 
         // Manage catalog (manager only)
         manageCatalogButton.addActionListener(e -> {
-            CatalogManagementWindow dialog = new CatalogManagementWindow(this, controller);
-            dialog.setVisible(true);
+            CatalogManagementWindow.open(this, controller);
             refreshCatalogView();
         });
 
@@ -388,8 +445,6 @@ public class StoreWindow extends JFrame {
 
         cartPanel.addRemoveItemListener(ev -> {
             JButton btn = (JButton) ev.getSource();
-            // CartPanel stores the CartItem on the remove button (CartPanel.PROP_CART_ITEM)
-            // so we retrieve it and then extract the product.
             CartItem item = (CartItem) btn.getClientProperty(CartPanel.PROP_CART_ITEM);
             if (item == null || item.getProduct() == null) return;
 
@@ -518,9 +573,7 @@ public class StoreWindow extends JFrame {
         for (Product p : products) {
             ProductPanel panel = new ProductPanel(p);
 
-            /**
-             * When a product is clicked, show its details (customer only).
-             */
+            // When a product is clicked, show its details (customer only).
             panel.addMouseListener(new MouseAdapter() {
                 @Override
                 public void mouseClicked(MouseEvent e) {
