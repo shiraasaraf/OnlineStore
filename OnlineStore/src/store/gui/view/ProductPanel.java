@@ -15,10 +15,17 @@ import java.text.NumberFormat;
 import java.util.Locale;
 
 /**
- * Panel that displays a product card in the catalog grid.
+ * Swing panel that renders a single product card in the catalog grid.
+ *
  * <p>
- * Shows the product image, name and price.
- * NEW: shows discounted price according to the store-wide DiscountStrategy.
+ * The panel displays the product image, name, and price. If a store-wide discount
+ * is active, the displayed price reflects the discounted amount and the original
+ * price may be shown as struck-through.
+ * </p>
+ *
+ * <p>
+ * If the product is out of stock, an "OUT OF STOCK" badge is displayed and the
+ * text colors are dimmed.
  * </p>
  */
 public class ProductPanel extends JPanel {
@@ -26,7 +33,7 @@ public class ProductPanel extends JPanel {
     /** Product represented by this panel. */
     private final Product product;
 
-    /** Controller (used to compute price after discount). */
+    /** Controller used for price calculations that depend on store configuration (may be {@code null}). */
     private final StoreController controller;
 
     /** Label used to display the product image. */
@@ -38,34 +45,41 @@ public class ProductPanel extends JPanel {
     /** Label used to display the discounted (or regular) price. */
     private final JLabel priceLabel;
 
-    /** Label used to display original price (strikethrough) when discount active. */
+    /** Label used to display original price (strikethrough) when discount is active. */
     private final JLabel originalPriceLabel;
 
-    /** "Out of stock" badge (shown only when stock==0). */
+    /** Badge displayed when the product is out of stock. */
     private final JLabel outOfStockBadge = new JLabel("OUT OF STOCK");
 
-    /** Fixed card size. */
+    /** Fixed card width. */
     private static final int CARD_W = 170;
-    private static final int CARD_H = 240; // slightly taller to fit extra price line
 
-    /** Image area target size. */
+    /** Fixed card height. */
+    private static final int CARD_H = 240;
+
+    /** Preferred image area width. */
     private static final int IMG_W = 169;
+
+    /** Preferred image area height. */
     private static final int IMG_H = 219;
 
-    /** Padding between image and the white frame. */
+    /** Padding applied to the image bounds. */
     private static final int IMG_PAD = 8;
 
-    /** Keep icon scaled to these inner bounds. */
+    /** Last scaled icon width used to avoid redundant rescaling. */
     private int lastScaledW = -1;
+
+    /** Last scaled icon height used to avoid redundant rescaling. */
     private int lastScaledH = -1;
 
+    /** Currency formatter used for displaying prices. */
     private final NumberFormat currency = NumberFormat.getCurrencyInstance(Locale.US);
 
     /**
-     * Constructs a new product panel for the given product.
+     * Constructs a product card panel for the given product.
      *
-     * @param product    product to display
-     * @param controller store controller (for discount calculations)
+     * @param product    the product to display
+     * @param controller the store controller used to compute discounted prices (may be {@code null})
      */
     public ProductPanel(Product product, StoreController controller) {
         this.product = product;
@@ -77,10 +91,8 @@ public class ProductPanel extends JPanel {
         setBackground(Color.WHITE);
         setOpaque(true);
 
-        // hand cursor when hovering over the product card
         setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
 
-        // ---- Image area ----
         JLayeredPane imageLayer = new JLayeredPane() {
             @Override
             public void doLayout() {
@@ -112,7 +124,6 @@ public class ProductPanel extends JPanel {
         imageLabel.setOpaque(true);
         imageLabel.setBackground(Color.WHITE);
 
-        // Badge styling
         outOfStockBadge.setOpaque(true);
         outOfStockBadge.setBackground(new Color(200, 0, 0));
         outOfStockBadge.setForeground(Color.WHITE);
@@ -125,7 +136,6 @@ public class ProductPanel extends JPanel {
 
         add(imageLayer, BorderLayout.CENTER);
 
-        // ---- Bottom info ----
         nameLabel = new JLabel(product.getDisplayName(), SwingConstants.CENTER);
 
         priceLabel = new JLabel("", SwingConstants.CENTER);
@@ -153,26 +163,28 @@ public class ProductPanel extends JPanel {
 
         add(infoPanel, BorderLayout.SOUTH);
 
-        // Load image
         loadImage();
-
-        // Set prices based on current discount strategy
         applyDiscountUi();
-
-        // Stock UI (badge + dim price)
         applyStockUi();
-
-        // Tooltip
         setToolTipText(buildTooltip());
     }
 
+    /**
+     * Returns the product represented by this panel.
+     *
+     * @return the product instance
+     */
     public Product getProduct() {
         return product;
     }
 
     /**
-     * Applies the current store discount strategy to the displayed price.
-     * Shows original price struck-through when a discount is active.
+     * Updates the displayed price according to the currently active discount strategy.
+     *
+     * <p>
+     * If an actual discount is applied, the original price is shown as struck-through
+     * and the discount name is displayed next to it.
+     * </p>
      */
     private void applyDiscountUi() {
         if (product == null) {
@@ -188,20 +200,21 @@ public class ProductPanel extends JPanel {
             discounted = controller.getPriceAfterDiscount(product);
         }
 
-        // Show discounted price (or regular if same)
         priceLabel.setText(currency.format(discounted));
 
-        // If there is an actual discount, show original price struck-through + name
         boolean hasDiscount = Math.abs(discounted - base) > 1e-9 && discounted < base;
 
         if (hasDiscount && controller != null) {
             String strategyName = controller.getDiscountDisplayName();
             originalPriceLabel.setText("<html><strike>" + currency.format(base) + "</strike> &nbsp;(" + strategyName + ")</html>");
         } else {
-            originalPriceLabel.setText(""); // hide when no discount
+            originalPriceLabel.setText("");
         }
     }
 
+    /**
+     * Updates the stock-related UI state (badge visibility and text color).
+     */
     private void applyStockUi() {
         boolean outOfStock = (product != null && product.getStock() <= 0);
         outOfStockBadge.setVisible(outOfStock);
@@ -209,10 +222,14 @@ public class ProductPanel extends JPanel {
         Color c = outOfStock ? Color.GRAY : Color.BLACK;
         priceLabel.setForeground(c);
         nameLabel.setForeground(outOfStock ? Color.GRAY : Color.BLACK);
-        // originalPriceLabel stays dark gray or empty, but dim it too when out of stock
         originalPriceLabel.setForeground(outOfStock ? Color.GRAY : Color.DARK_GRAY);
     }
 
+    /**
+     * Builds an HTML tooltip containing product name, price, stock information and description.
+     *
+     * @return an HTML tooltip string
+     */
     private String buildTooltip() {
         if (product == null) return "No product";
 
@@ -243,6 +260,12 @@ public class ProductPanel extends JPanel {
                 + "</html>";
     }
 
+    /**
+     * Escapes a string for safe insertion into an HTML tooltip.
+     *
+     * @param s the input string
+     * @return the escaped HTML string (never {@code null})
+     */
     private static String escapeHtml(String s) {
         if (s == null) return "";
         return s.replace("&", "&amp;")
@@ -251,6 +274,9 @@ public class ProductPanel extends JPanel {
                 .replace("\"", "&quot;");
     }
 
+    /**
+     * Loads the product image icon from the classpath using {@link Product#getImagePath()}.
+     */
     private void loadImage() {
         if (product == null) return;
         String path = product.getImagePath();
@@ -265,6 +291,12 @@ public class ProductPanel extends JPanel {
         lastScaledH = -1;
     }
 
+    /**
+     * Rescales the current image icon to match the given target bounds if needed.
+     *
+     * @param w target width in pixels
+     * @param h target height in pixels
+     */
     private void maybeRescaleIcon(int w, int h) {
         if (w <= 0 || h <= 0) return;
         if (w == lastScaledW && h == lastScaledH) return;

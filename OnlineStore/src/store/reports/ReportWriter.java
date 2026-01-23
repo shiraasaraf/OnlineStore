@@ -1,3 +1,8 @@
+/**
+ * Submitted by:
+ * Tamar Nahum, ID 021983812
+ * Shira Asaraf, ID 322218439
+ */
 package store.reports;
 
 import java.io.IOException;

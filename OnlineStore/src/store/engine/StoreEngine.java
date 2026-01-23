@@ -88,10 +88,22 @@ public class StoreEngine implements StoreSubject {
     // Discount (Strategy)
     // ---------------------------------------------------------------------
 
+
+    /**
+     * Returns the currently active discount strategy.
+     *
+     * @return the current {@link DiscountStrategy}, or {@code null} if none is set
+     */
     public DiscountStrategy getDiscountStrategy() {
         return discountStrategy;
     }
 
+    /**
+     * Sets the active discount strategy and notifies observers of the change.
+     *
+     * @param strategy the discount strategy to apply (must not be {@code null})
+     * @throws IllegalArgumentException if {@code strategy} is {@code null}
+     */
     public void setDiscountStrategy(DiscountStrategy strategy) {
         if (strategy == null) {
             throw new IllegalArgumentException("strategy cannot be null");
@@ -100,6 +112,16 @@ public class StoreEngine implements StoreSubject {
         notifyObservers();
     }
 
+    /**
+     * Calculates the total cart price after applying the active discount strategy.
+     *
+     * <p>
+     * If no discount strategy is set, the cart subtotal is returned unchanged.
+     * </p>
+     *
+     * @param cart the shopping cart to calculate the total for
+     * @return the total amount after applying the discount
+     */
     public double calculateTotalAfterDiscount(Cart cart) {
         if (cart == null) return 0.0;
         double subtotal = cart.calculateTotal();
@@ -443,6 +465,18 @@ public class StoreEngine implements StoreSubject {
     // Helpers
     // ---------------------------------------------------------------------
 
+    /**
+     * Searches for a product with the given name in the product collection.
+     *
+     * <p>
+     * The comparison is case-insensitive. If no matching product is found,
+     * {@code null} is returned.
+     * </p>
+     *
+     * @param name the name of the product to search for
+     * @return the matching {@link Product}, or {@code null} if not found or if
+     *         {@code name} is {@code null}
+     */
     private Product findProductByName(String name) {
         if (name == null) {
             return null;

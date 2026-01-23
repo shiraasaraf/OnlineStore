@@ -26,21 +26,17 @@ import java.io.IOException;
 import java.util.List;
 
 /**
- * Modal manager-only dialog for managing the product catalog and inventory.
+ * Modal manager-only dialog used to manage the product catalog and inventory.
  *
  * <p>
- * The dialog provides operations such as:
+ * This dialog enables catalog administration actions such as adding/removing products,
+ * changing stock levels, generating reports, and configuring the active store-wide
+ * discount strategy.
  * </p>
- * <ul>
- *   <li>Removing products from the catalog</li>
- *   <li>Increasing/decreasing stock</li>
- *   <li>Adding new products</li>
- *   <li>Generating inventory/sales reports to console or CSV</li>
- *   <li><b>NEW:</b> Switching the store-wide discount strategy at runtime (Strategy pattern)</li>
- * </ul>
  *
  * <p>
- * This dialog observes store model changes and refreshes its list automatically.
+ * The dialog registers as an observer of the store model (via {@link SystemUpdatable})
+ * and refreshes its product list when the model changes.
  * </p>
  */
 public class CatalogManagementWindow extends JDialog implements SystemUpdatable {
@@ -65,14 +61,22 @@ public class CatalogManagementWindow extends JDialog implements SystemUpdatable 
 
     private final JSpinner stockSpinner;
 
-    // -------------------------
-    // NEW: Discount controls
-    // -------------------------
     private final JLabel currentDiscountLabel;
     private final JComboBox<String> discountTypeCombo;
     private final JSpinner percentSpinner;
     private final JButton applyDiscountButton;
 
+    /**
+     * Opens the catalog management dialog as a singleton modal window.
+     *
+     * <p>
+     * If an existing instance is already open, it is brought to the front and reused.
+     * </p>
+     *
+     * @param parentWindow the owning parent window (must not be {@code null})
+     * @param controller   the store controller (must not be {@code null})
+     * @throws IllegalArgumentException if any argument is {@code null}
+     */
     public static void open(StoreWindow parentWindow, StoreController controller) {
         if (parentWindow == null) {
             throw new IllegalArgumentException("parentWindow cannot be null");
@@ -108,6 +112,19 @@ public class CatalogManagementWindow extends JDialog implements SystemUpdatable 
         instance.setVisible(true);
     }
 
+    /**
+     * Constructs a manager-only modal dialog for catalog and inventory management.
+     *
+     * <p>
+     * The dialog registers itself as an observer of the store model and unregisters
+     * automatically when closing.
+     * </p>
+     *
+     * @param parentWindow the owning parent window (must not be {@code null})
+     * @param controller   the store controller (must not be {@code null})
+     * @throws IllegalArgumentException if any argument is {@code null}
+     * @throws IllegalStateException    if the controller does not have manager permissions
+     */
     public CatalogManagementWindow(StoreWindow parentWindow, StoreController controller) {
         super(parentWindow, "Catalog / Inventory Management", true);
 
@@ -132,10 +149,8 @@ public class CatalogManagementWindow extends JDialog implements SystemUpdatable 
             throw new IllegalStateException("Manager permissions required");
         }
 
-        // Register as observer (Observer pattern).
         this.controller.getEngine().addObserver(this);
 
-        // Ensure we unregister when the dialog is closed.
         addWindowListener(new WindowAdapter() {
             @Override
             public void windowClosed(WindowEvent e) {
@@ -185,9 +200,6 @@ public class CatalogManagementWindow extends JDialog implements SystemUpdatable 
         rightPanel.setLayout(new BoxLayout(rightPanel, BoxLayout.Y_AXIS));
         rightPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
 
-        // -------------------------
-        // NEW: Discount area (top)
-        // -------------------------
         rightPanel.add(new JLabel("Store Discount:"));
         rightPanel.add(Box.createVerticalStrut(6));
 
@@ -222,9 +234,6 @@ public class CatalogManagementWindow extends JDialog implements SystemUpdatable 
         rightPanel.add(new JSeparator());
         rightPanel.add(Box.createVerticalStrut(12));
 
-        // -------------------------
-        // Existing: Stock controls
-        // -------------------------
         rightPanel.add(new JLabel("Stock change amount:"));
         stockSpinner = new JSpinner(new SpinnerNumberModel(1, 1, 1_000_000, 1));
         stockSpinner.setMaximumSize(new Dimension(Integer.MAX_VALUE, stockSpinner.getPreferredSize().height));
@@ -275,24 +284,25 @@ public class CatalogManagementWindow extends JDialog implements SystemUpdatable 
         printReportButton.addActionListener(this::onPrintReportToConsole);
         saveReportButton.addActionListener(this::onSaveReportToCsv);
 
-        // -------------------------
-        // NEW: wire discount events
-        // -------------------------
         discountTypeCombo.addActionListener(e -> updateDiscountControlsEnabledState());
         updateDiscountControlsEnabledState();
         applyDiscountButton.addActionListener(this::onApplyDiscount);
     }
 
-    // -------------------------
-    // NEW: Discount logic
-    // -------------------------
-
+    /**
+     * Enables or disables discount-related input controls based on the selected discount type.
+     */
     private void updateDiscountControlsEnabledState() {
         String type = (String) discountTypeCombo.getSelectedItem();
         boolean percentage = "Percentage".equals(type);
         percentSpinner.setEnabled(percentage);
     }
 
+    /**
+     * Extracts the current percentage value from the percentage spinner.
+     *
+     * @return the spinner value as a {@code double}, or {@code 0.0} if unavailable
+     */
     private double getPercentValue() {
         Object v = percentSpinner.getValue();
         if (v instanceof Integer) return (Integer) v;
@@ -300,6 +310,11 @@ public class CatalogManagementWindow extends JDialog implements SystemUpdatable 
         return 0.0;
     }
 
+    /**
+     * Applies the selected discount strategy through the controller and updates the UI accordingly.
+     *
+     * @param e the triggering action event
+     */
     private void onApplyDiscount(ActionEvent e) {
         String type = (String) discountTypeCombo.getSelectedItem();
         boolean ok;
@@ -321,8 +336,6 @@ public class CatalogManagementWindow extends JDialog implements SystemUpdatable 
             return;
         }
 
-        // After applying, engine notifies observers (including customers).
-        // We update our own label immediately too.
         currentDiscountLabel.setText("Current: " + controller.getDiscountDisplayName());
 
         JOptionPane.showMessageDialog(
@@ -333,10 +346,9 @@ public class CatalogManagementWindow extends JDialog implements SystemUpdatable 
         );
     }
 
-    // -------------------------
-    // Existing code
-    // -------------------------
-
+    /**
+     * Refreshes the product list model from the current store catalog.
+     */
     private void refreshProductList() {
         listModel.clear();
         List<Product> products = controller.getAllProducts();
@@ -345,6 +357,11 @@ public class CatalogManagementWindow extends JDialog implements SystemUpdatable 
         }
     }
 
+    /**
+     * Extracts the current stock delta value from the stock spinner.
+     *
+     * @return the stock delta as an integer (defaults to {@code 1} if unavailable)
+     */
     private int getStockDelta() {
         Object v = stockSpinner.getValue();
         if (v instanceof Integer) return (Integer) v;
@@ -352,6 +369,11 @@ public class CatalogManagementWindow extends JDialog implements SystemUpdatable 
         return 1;
     }
 
+    /**
+     * Returns the currently selected product in the list, showing a warning dialog if none is selected.
+     *
+     * @return the selected product, or {@code null} if no selection exists
+     */
     private Product getSelectedOrWarn() {
         Product selected = productList.getSelectedValue();
         if (selected == null) {
@@ -366,8 +388,11 @@ public class CatalogManagementWindow extends JDialog implements SystemUpdatable 
     }
 
     /**
-     * Persists the current catalog snapshot to the default CSV file.
-     * The save is performed off the EDT to keep the UI responsive.
+     * Saves the current catalog snapshot to the default catalog CSV file using a background worker.
+     *
+     * <p>
+     * The save is performed off the Event Dispatch Thread (EDT) to keep the UI responsive.
+     * </p>
      */
     private void saveCatalogToDefaultFile() {
         new SwingWorker<Void, Void>() {
@@ -393,6 +418,11 @@ public class CatalogManagementWindow extends JDialog implements SystemUpdatable 
         }.execute();
     }
 
+    /**
+     * Handles deletion of the currently selected product after user confirmation.
+     *
+     * @param e the triggering action event
+     */
     private void onRemoveClicked(ActionEvent e) {
         Product selected = getSelectedOrWarn();
         if (selected == null) return;
@@ -414,6 +444,11 @@ public class CatalogManagementWindow extends JDialog implements SystemUpdatable 
         saveCatalogToDefaultFile();
     }
 
+    /**
+     * Handles increasing stock for the selected product using the amount from the stock spinner.
+     *
+     * @param e the triggering action event
+     */
     private void onIncreaseStock(ActionEvent e) {
         Product selected = getSelectedOrWarn();
         if (selected == null) return;
@@ -428,6 +463,11 @@ public class CatalogManagementWindow extends JDialog implements SystemUpdatable 
         saveCatalogToDefaultFile();
     }
 
+    /**
+     * Handles decreasing stock for the selected product using the amount from the stock spinner.
+     *
+     * @param e the triggering action event
+     */
     private void onDecreaseStock(ActionEvent e) {
         Product selected = getSelectedOrWarn();
         if (selected == null) return;
@@ -447,6 +487,11 @@ public class CatalogManagementWindow extends JDialog implements SystemUpdatable 
         saveCatalogToDefaultFile();
     }
 
+    /**
+     * Handles creation of a new product via a modal input dialog and adds it to the catalog.
+     *
+     * @param e the triggering action event
+     */
     private void onAddProduct(ActionEvent e) {
         Product newProduct = showAddProductDialog();
         if (newProduct == null) return;
@@ -460,6 +505,11 @@ public class CatalogManagementWindow extends JDialog implements SystemUpdatable 
         saveCatalogToDefaultFile();
     }
 
+    /**
+     * Generates the chosen report type and prints it to the console.
+     *
+     * @param e the triggering action event
+     */
     private void onPrintReportToConsole(ActionEvent e) {
         String chosen = chooseReportType();
         if (chosen == null) return;
@@ -491,6 +541,11 @@ public class CatalogManagementWindow extends JDialog implements SystemUpdatable 
         }
     }
 
+    /**
+     * Generates the chosen report type and saves it as a CSV file selected by the user.
+     *
+     * @param e the triggering action event
+     */
     private void onSaveReportToCsv(ActionEvent e) {
         String chosen = chooseReportType();
         if (chosen == null) return;
@@ -534,6 +589,11 @@ public class CatalogManagementWindow extends JDialog implements SystemUpdatable 
         }
     }
 
+    /**
+     * Prompts the user to choose which report type to generate.
+     *
+     * @return {@code "Inventory"} or {@code "Sales"}, or {@code null} if cancelled
+     */
     private String chooseReportType() {
         Object[] options = {"Inventory", "Sales"};
 
@@ -554,15 +614,23 @@ public class CatalogManagementWindow extends JDialog implements SystemUpdatable 
         return (String) options[res];
     }
 
+    /**
+     * Receives model update notifications and refreshes the product list and discount label on the EDT.
+     */
     @Override
     public void update() {
         SwingUtilities.invokeLater(() -> {
             refreshProductList();
-            // keep discount label synced (in case discount changed elsewhere)
             currentDiscountLabel.setText("Current: " + controller.getDiscountDisplayName());
         });
     }
 
+    /**
+     * Shows a dialog for creating a new product, validates user input, and creates the product
+     * using {@link ProductFactory} according to the selected {@link Category}.
+     *
+     * @return the created {@link Product}, or {@code null} if the dialog was cancelled or validation failed
+     */
     private Product showAddProductDialog() {
         JTextField nameField = new JTextField(18);
         JTextField priceField = new JTextField(18);

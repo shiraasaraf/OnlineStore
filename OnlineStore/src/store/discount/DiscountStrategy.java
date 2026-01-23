@@ -6,28 +6,27 @@
 package store.discount;
 
 /**
- * Strategy interface for applying discounts on a cart subtotal.
+ * Defines a strategy for applying a discount to a cart subtotal.
  *
  * <p>
- * This is the Strategy design pattern: the store can switch the active
- * discount algorithm at runtime (e.g., no discount, percentage discount,
- * future discounts such as "buy 2 get 1"), without changing cart/order code.
+ * Implementations of this interface encapsulate different discount
+ * calculation policies that can be applied dynamically.
  * </p>
  */
 public interface DiscountStrategy {
 
     /**
-     * Applies this discount strategy on the given subtotal.
+     * Applies the discount to the given subtotal.
      *
-     * @param subtotal cart subtotal before discount (must be >= 0)
-     * @return final total after discount (never negative)
+     * @param subtotal the cart subtotal before discount (must be non-negative)
+     * @return the total amount after applying the discount
      */
     double apply(double subtotal);
 
     /**
-     * Returns a human-readable name for UI display.
+     * Returns a display name describing this discount strategy.
      *
-     * @return display name
+     * @return a human-readable discount name
      */
     String getDisplayName();
 }

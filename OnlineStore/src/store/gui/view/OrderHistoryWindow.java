@@ -1,3 +1,8 @@
+/**
+ * Submitted by:
+ * Tamar Nahum, ID 021983812
+ * Shira Asaraf, ID 322218439
+ */
 package store.gui.view;
 
 import store.cart.CartItem;
@@ -14,6 +19,7 @@ import java.util.List;
 
 /**
  * Modal dialog that displays order history in a non-editable table.
+ *
  * <p>
  * The displayed data depends on the current user's permissions, as determined by the
  * provided {@link StoreController}:
@@ -47,6 +53,11 @@ public class OrderHistoryWindow extends JDialog implements SystemUpdatable {
 
     /**
      * Creates a modal "Order History" dialog.
+     *
+     * <p>
+     * If a controller is provided, the dialog registers as an observer of the store engine
+     * and refreshes automatically upon model updates.
+     * </p>
      *
      * @param parent     the parent frame used for modality and centering
      * @param controller the store controller used to fetch orders (may be {@code null})
@@ -113,6 +124,11 @@ public class OrderHistoryWindow extends JDialog implements SystemUpdatable {
 
     /**
      * Reloads the table contents from the controller.
+     *
+     * <p>
+     * If the controller is {@code null}, the method does nothing. The table columns
+     * depend on whether the current user has manager permissions.
+     * </p>
      */
     public void refreshOrders() {
         tableModel.setRowCount(0);
@@ -151,6 +167,17 @@ public class OrderHistoryWindow extends JDialog implements SystemUpdatable {
         }
     }
 
+    /**
+     * Builds a single-line summary of the items in an order.
+     *
+     * <p>
+     * Each item is formatted as {@code "<productName> x<quantity>"} and items are separated by {@code "; "}.
+     * Null items or items without a product are skipped.
+     * </p>
+     *
+     * @param order the order whose items should be summarized
+     * @return a human-readable summary string, or an empty string if unavailable
+     */
     private String buildItemsSummary(Order order) {
         if (order == null || order.getItems() == null) {
             return "";
@@ -173,14 +200,23 @@ public class OrderHistoryWindow extends JDialog implements SystemUpdatable {
         return sb.toString();
     }
 
+    /**
+     * Formats a {@link LocalDateTime} for display in the table.
+     *
+     * @param dt the date-time value to format
+     * @return the formatted date-time string, or an empty string if {@code dt} is {@code null}
+     */
     private String formatDateTime(LocalDateTime dt) {
         if (dt == null) return "";
         return dt.format(DATE_TIME_FORMAT);
     }
 
     /**
-     * Receives model-change notifications from the store engine.
-     * Updates the table on the Swing Event Dispatch Thread.
+     * Receives model-change notifications from the store engine and refreshes the table.
+     *
+     * <p>
+     * The refresh is executed on the Swing Event Dispatch Thread (EDT).
+     * </p>
      */
     @Override
     public void update() {

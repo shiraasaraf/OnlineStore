@@ -10,55 +10,61 @@ import store.order.Order;
 import java.util.Objects;
 
 /**
- * Adapter class that wraps the external {@link FastShipAPI}.
+ * Adapter that integrates the external {@link FastShipAPI} with the system.
  *
  * <p>
- * Implements the Adapter Design Pattern:
+ * This class implements the Adapter design pattern by adapting the
+ * {@link FastShipAPI} interface to the {@link ShippingProvider} interface
+ * expected by the application.
  * </p>
+ *
  * <ul>
  *   <li><b>Target:</b> {@link ShippingProvider}</li>
  *   <li><b>Adaptee:</b> {@link FastShipAPI}</li>
- *   <li><b>Adapter:</b> this class ({@code Adapter})</li>
+ *   <li><b>Adapter:</b> {@code Adapter}</li>
  * </ul>
- *
- * <p>
- * This allows the system to use FastShip without changing existing code
- * that expects {@link ShippingProvider}.
- * </p>
  */
 public class Adapter implements ShippingProvider {
 
+    /** Wrapped external shipping API. */
     private final FastShipAPI fastShipAPI;
 
     /**
-     * Constructs an Adapter around FastShip API.
+     * Creates a new adapter wrapping the given FastShip API instance.
      *
-     * @param fastShipAPI external API instance
+     * @param fastShipAPI external shipping API instance
+     * @throws NullPointerException if {@code fastShipAPI} is {@code null}
      */
     public Adapter(FastShipAPI fastShipAPI) {
         this.fastShipAPI = Objects.requireNonNull(fastShipAPI, "fastShipAPI cannot be null");
     }
 
+    /**
+     * Ships the given order using the external FastShip API.
+     *
+     * <p>
+     * The order data is translated to the parameters required by
+     * {@link FastShipAPI#executeDelivery(int, String, double)}.
+     * </p>
+     *
+     * @param order the order to be shipped
+     * @throws IllegalArgumentException if {@code order} is {@code null}
+     */
     @Override
     public void shipOrder(Order order) {
         if (order == null) {
             throw new IllegalArgumentException("order cannot be null");
         }
 
-        // Map our Order -> external API parameters
         int orderId = order.getOrderID();
         String recipient = Objects.toString(order.getCustomerUsername(), "UNKNOWN");
         double amount = order.getTotalAmount();
 
-        // Call the external API (incompatible method name/signature)
         String tracking = fastShipAPI.executeDelivery(orderId, recipient, amount);
 
-        // Optional: advance order status if your model expects it
-        // (Only keep these lines if Order has these methods and your flow wants it)
         order.pay();
         order.ship();
 
-        // Tracking is printed (no required storage field mentioned)
         System.out.println("[FastShip] Shipped order " + orderId + ", tracking=" + tracking);
     }
 }

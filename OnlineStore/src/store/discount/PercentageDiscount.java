@@ -6,18 +6,21 @@
 package store.discount;
 
 /**
- * A discount strategy that reduces the subtotal by a fixed percentage.
+ * A discount strategy that applies a fixed percentage reduction
+ * to a cart subtotal.
  */
 public final class PercentageDiscount implements DiscountStrategy {
 
-    /** Percentage between 0 and 100. */
+    /**
+     * The discount percentage, in the range {@code [0, 100]}.
+     */
     private final double percent;
 
     /**
-     * Creates a percentage discount.
+     * Constructs a percentage-based discount strategy.
      *
-     * @param percent discount percent in range [0,100]
-     * @throws IllegalArgumentException if percent is out of range
+     * @param percent the discount percentage (must be between 0 and 100)
+     * @throws IllegalArgumentException if {@code percent} is out of range
      */
     public PercentageDiscount(double percent) {
         if (Double.isNaN(percent) || percent < 0.0 || percent > 100.0) {
@@ -26,10 +29,21 @@ public final class PercentageDiscount implements DiscountStrategy {
         this.percent = percent;
     }
 
+    /**
+     * Returns the discount percentage.
+     *
+     * @return the discount percentage
+     */
     public double getPercent() {
         return percent;
     }
 
+    /**
+     * Applies the percentage discount to the given subtotal.
+     *
+     * @param subtotal the cart subtotal before discount
+     * @return the subtotal after applying the percentage discount
+     */
     @Override
     public double apply(double subtotal) {
         if (subtotal <= 0) return 0.0;
@@ -38,6 +52,11 @@ public final class PercentageDiscount implements DiscountStrategy {
         return Math.max(0.0, total);
     }
 
+    /**
+     * Returns a readable description of this discount strategy.
+     *
+     * @return a display string representing the discount
+     */
     @Override
     public String getDisplayName() {
         if (percent == 0.0) return "No discount";
