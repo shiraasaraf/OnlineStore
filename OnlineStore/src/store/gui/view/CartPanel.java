@@ -18,7 +18,7 @@ import java.util.Locale;
 /**
  * Swing panel that displays the shopping cart contents.
  * <p>
- * Shows cart items, total price, and a checkout button.
+ * Shows cart items, subtotal/discount/final total, and a checkout button.
  * A controller can attach listeners for removing items and for checkout.
  * </p>
  */
@@ -30,7 +30,13 @@ public class CartPanel extends JPanel {
     /** Panel that holds item rows. */
     private final JPanel itemsPanel;
 
-    /** Displays the current cart total. */
+    /** Displays the current cart subtotal. */
+    private final JLabel subtotalLabel;
+
+    /** Displays the current cart discount (amount + strategy name). */
+    private final JLabel discountLabel;
+
+    /** Displays the current cart final total (after discount). */
     private final JLabel totalLabel;
 
     /** Checkout button. */
@@ -53,34 +59,64 @@ public class CartPanel extends JPanel {
 
         add(new JScrollPane(itemsPanel), BorderLayout.CENTER);
 
+        subtotalLabel = new JLabel("Subtotal: " + currency.format(0.0));
+        discountLabel = new JLabel("Discount: " + currency.format(0.0) + " (No discount)");
         totalLabel = new JLabel("Total: " + currency.format(0.0));
+
         checkoutButton = new JButton("Checkout");
 
+        JPanel totals = new JPanel();
+        totals.setLayout(new BoxLayout(totals, BoxLayout.Y_AXIS));
+        totals.add(subtotalLabel);
+        totals.add(discountLabel);
+        totals.add(totalLabel);
+
         JPanel bottom = new JPanel(new BorderLayout());
-        bottom.add(totalLabel, BorderLayout.WEST);
+        bottom.add(totals, BorderLayout.WEST);
         bottom.add(checkoutButton, BorderLayout.EAST);
 
         add(bottom, BorderLayout.SOUTH);
     }
 
     /**
-     * Updates the displayed cart items and total.
+     * Updates the displayed cart items (rows).
+     * <p>
+     * Note: Totals can be set accurately using {@link #setTotals(double, String, double)}.
+     * This method keeps a safe default behavior (no-discount) if called alone.
+     * </p>
      *
      * @param items cart items to display (not modified by this component)
      */
     public void setItems(List<CartItem> items) {
         itemsPanel.removeAll();
 
-        double total = 0.0;
+        double subtotal = 0.0;
         for (CartItem item : items) {
             itemsPanel.add(createRow(item));
-            total += item.getTotalPrice();
+            subtotal += item.getTotalPrice();
         }
 
-        totalLabel.setText("Total: " + currency.format(total));
+        // Default (no discount) if totals aren't provided by the window/controller.
+        setTotals(subtotal, "No discount", subtotal);
 
         itemsPanel.revalidate();
         itemsPanel.repaint();
+    }
+
+    /**
+     * Sets subtotal/discount/final total labels.
+     *
+     * @param subtotal     subtotal before discount
+     * @param discountText discount strategy display name (e.g. "10% off")
+     * @param finalTotal   total after discount
+     */
+    public void setTotals(double subtotal, String discountText, double finalTotal) {
+        double discountAmount = Math.max(0.0, subtotal - finalTotal);
+
+        subtotalLabel.setText("Subtotal: " + currency.format(subtotal));
+        discountLabel.setText("Discount: " + currency.format(discountAmount)
+                + " (" + (discountText == null ? "" : discountText) + ")");
+        totalLabel.setText("Total: " + currency.format(finalTotal));
     }
 
     /**

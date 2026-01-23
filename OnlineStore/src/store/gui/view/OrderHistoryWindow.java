@@ -1,12 +1,7 @@
-/**
- * Submitted by:
- * Tamar Nahum, ID 021983812
- * Shira Asaraf, ID 322218439
- */
-
 package store.gui.view;
 
 import store.cart.CartItem;
+import store.core.SystemUpdatable;
 import store.gui.controller.StoreController;
 import store.order.Order;
 
@@ -28,12 +23,8 @@ import java.util.List;
  *       additional "Customer" column is shown.</li>
  *   <li>Otherwise, only the current customer's orders are displayed.</li>
  * </ul>
- * <p>
- * Data is fetched from the controller and loaded into the table when the dialog is created,
- * and can be refreshed manually by clicking the "Refresh" button.
- * </p>
  */
-public class OrderHistoryWindow extends JDialog {
+public class OrderHistoryWindow extends JDialog implements SystemUpdatable {
 
     /** Controller used to fetch orders. May be {@code null}. */
     private final StoreController controller;
@@ -56,11 +47,6 @@ public class OrderHistoryWindow extends JDialog {
 
     /**
      * Creates a modal "Order History" dialog.
-     * <p>
-     * The dialog builds its table columns based on whether the provided controller has
-     * manager permissions. Data is loaded immediately by calling {@link #refreshOrders()}.
-     * If {@code controller} is {@code null}, the dialog opens but remains empty.
-     * </p>
      *
      * @param parent     the parent frame used for modality and centering
      * @param controller the store controller used to fetch orders (may be {@code null})
@@ -70,13 +56,30 @@ public class OrderHistoryWindow extends JDialog {
 
         this.controller = controller;
 
+        if (this.controller != null) {
+            this.controller.getEngine().addObserver(this);
+        }
+
+        addWindowListener(new java.awt.event.WindowAdapter() {
+            @Override
+            public void windowClosed(java.awt.event.WindowEvent e) {
+                if (OrderHistoryWindow.this.controller != null) {
+                    OrderHistoryWindow.this.controller.getEngine().removeObserver(OrderHistoryWindow.this);
+                }
+            }
+
+            @Override
+            public void windowClosing(java.awt.event.WindowEvent e) {
+                dispose();
+            }
+        });
+
         setSize(900, 450);
         setLocationRelativeTo(parent);
         setLayout(new BorderLayout(10, 10));
 
         boolean isManager = (controller != null && controller.canManage());
 
-        // Manager sees an extra column: Customer
         Object[] columns = isManager
                 ? new Object[]{"Customer", "Order ID", "Total Amount", "Created At", "Items"}
                 : new Object[]{"Order ID", "Total Amount", "Created At", "Items"};
@@ -110,11 +113,6 @@ public class OrderHistoryWindow extends JDialog {
 
     /**
      * Reloads the table contents from the controller.
-     * <p>
-     * If the controller has manager permissions, all orders are loaded; otherwise,
-     * only the current customer's orders are loaded. The table is cleared before
-     * inserting the refreshed rows.
-     * </p>
      */
     public void refreshOrders() {
         tableModel.setRowCount(0);
@@ -153,16 +151,6 @@ public class OrderHistoryWindow extends JDialog {
         }
     }
 
-    /**
-     * Builds a readable items summary for an order.
-     * <p>
-     * The summary format is a semicolon-separated list of items:
-     * {@code "ProductName xQuantity; ProductName xQuantity; ..."}.
-     * </p>
-     *
-     * @param order the order whose items should be summarized
-     * @return a summary string, or an empty string if the order has no items
-     */
     private String buildItemsSummary(Order order) {
         if (order == null || order.getItems() == null) {
             return "";
@@ -185,14 +173,17 @@ public class OrderHistoryWindow extends JDialog {
         return sb.toString();
     }
 
-    /**
-     * Formats the given date-time value for display in the orders table.
-     *
-     * @param dt the date-time to format
-     * @return a formatted string, or an empty string if {@code dt} is {@code null}
-     */
     private String formatDateTime(LocalDateTime dt) {
         if (dt == null) return "";
         return dt.format(DATE_TIME_FORMAT);
+    }
+
+    /**
+     * Receives model-change notifications from the store engine.
+     * Updates the table on the Swing Event Dispatch Thread.
+     */
+    @Override
+    public void update() {
+        SwingUtilities.invokeLater(this::refreshOrders);
     }
 }

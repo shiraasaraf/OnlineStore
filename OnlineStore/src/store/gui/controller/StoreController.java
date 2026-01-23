@@ -1,19 +1,22 @@
-/**
- * Submitted by:
- * Tamar Nahum, ID 021983812
- * Shira Asaraf, ID 322218439
- */
 package store.gui.controller;
 
 import store.cart.Cart;
 import store.cart.CartItem;
 import store.core.Customer;
 import store.core.Manager;
+import store.discount.DiscountStrategy;
+import store.discount.NoDiscount;
+import store.discount.PercentageDiscount;
 import store.engine.StoreEngine;
 import store.io.OrderHistoryIO;
 import store.io.ProductCatalogIO;
 import store.order.Order;
 import store.products.Product;
+import store.shipping.Adapter;
+import store.shipping.FastShipAPI;
+import store.shipping.ShippingProvider;
+import store.discount.DiscountStrategy;
+
 
 import java.io.File;
 import java.io.IOException;
@@ -22,10 +25,16 @@ import java.util.List;
 
 /**
  * Controller for the store GUI.
+ *
  * <p>
- * Bridges between the view layer and the model (engine/customer/manager).
- * File I/O is delegated to store.io classes.
- * Thread-safety: critical operations synchronize on the shared engine instance.
+ * Acts as an application-layer facade between the UI and the domain model.
+ * Handles coordination logic such as catalog loading/saving, cart operations,
+ * and checkout workflow.
+ * </p>
+ *
+ * <p>
+ * Note: many operations synchronize on the shared {@link StoreEngine} instance
+ * to keep the UI actions consistent with the underlying state.
  * </p>
  */
 public class StoreController {
@@ -36,69 +45,122 @@ public class StoreController {
     /** Shared store engine (model). */
     private final StoreEngine engine;
 
-    /** Current customer (always exists in customer windows). */
+    /** Current customer (used for cart/checkout operations). */
     private final Customer customer;
 
     /** Current manager (non-null only in manager mode). */
     private final Manager manager;
 
+    /** Shipping provider used to dispatch orders. */
+    private final ShippingProvider shippingProvider;
+
     /**
      * Constructs a controller for the given engine and active user session.
      *
-     * @param engine   shared store engine
-     * @param customer current customer (required for cart/checkout)
+     * @param engine   shared store engine (must not be null)
+     * @param customer current customer (may be null in manager-only flows)
      * @param manager  current manager (null when not in manager mode)
      */
     public StoreController(StoreEngine engine, Customer customer, Manager manager) {
+        if (engine == null) {
+            throw new IllegalArgumentException("engine cannot be null");
+        }
+
         this.engine = engine;
         this.customer = customer;
         this.manager = manager;
+
+        this.shippingProvider = new Adapter(new FastShipAPI());
+    }
+
+    /**
+     * Provides read-only access to the store engine for UI-level features that
+     * need aggregated data (e.g., reporting).
+     *
+     * @return the shared store engine instance
+     */
+    public StoreEngine getEngine() {
+        return engine;
+    }
+
+    // ---------------------------------------------------------------------
+    // Discount totals (Customer UI)
+    // ---------------------------------------------------------------------
+
+    public double getCartSubtotal() {
+        if (customer == null) return 0.0;
+        synchronized (engine) {
+            Cart cart = customer.getCart();
+            return (cart == null) ? 0.0 : cart.calculateTotal();
+        }
+    }
+
+    public double getCartTotalAfterDiscount() {
+        if (customer == null) return 0.0;
+        synchronized (engine) {
+            return engine.calculateTotalAfterDiscount(customer.getCart());
+        }
+    }
+
+    public String getDiscountDisplayName() {
+        synchronized (engine) {
+            DiscountStrategy s = engine.getDiscountStrategy();
+            return (s == null) ? "No discount" : s.getDisplayName();
+        }
+    }
+
+    public double getDiscountAmount() {
+        double subtotal = getCartSubtotal();
+        double total = getCartTotalAfterDiscount();
+        return Math.max(0.0, subtotal - total);
+    }
+
+    // ---------------------------------------------------------------------
+    // Discount switching (Manager)
+    // ---------------------------------------------------------------------
+
+    public boolean setNoDiscount() {
+        if (!canManage()) return false;
+        synchronized (engine) {
+            engine.setDiscountStrategy(NoDiscount.INSTANCE);
+            return true;
+        }
+    }
+
+    public boolean setPercentageDiscount(double percent) {
+        if (!canManage()) return false;
+        synchronized (engine) {
+            if (percent <= 0.0) {
+                engine.setDiscountStrategy(NoDiscount.INSTANCE);
+            } else {
+                engine.setDiscountStrategy(new PercentageDiscount(percent));
+            }
+            return true;
+        }
     }
 
     // ---------------------------------------------------------------------
     // Products / Catalog
     // ---------------------------------------------------------------------
 
-    /**
-     * Returns products that are currently in stock.
-     *
-     * @return list of available products
-     */
     public List<Product> getAvailableProducts() {
         synchronized (engine) {
             return engine.getAvailableProducts();
         }
     }
 
-    /**
-     * Returns all products in the catalog (including out-of-stock products).
-     *
-     * @return list of all products
-     */
     public List<Product> getAllProducts() {
         synchronized (engine) {
             return engine.getAllProducts();
         }
     }
 
-    /**
-     * Removes a product from the catalog (manager usage).
-     *
-     * @param product product to remove
-     * @return true if removed; false otherwise
-     */
     public boolean removeProduct(Product product) {
         synchronized (engine) {
             return engine.removeProduct(product);
         }
     }
 
-    /**
-     * Loads products from a CSV file and adds them to the engine.
-     *
-     * @param file source file
-     * @throws IOException if reading fails
-     */
     public void loadProductsFromFile(File file) throws IOException {
         List<Product> loaded;
         synchronized (PRODUCT_FILE_LOCK) {
@@ -106,18 +168,10 @@ public class StoreController {
         }
 
         synchronized (engine) {
-            for (Product p : loaded) {
-                engine.addProduct(p);
-            }
+            engine.addProducts(loaded);
         }
     }
 
-    /**
-     * Saves current products to a CSV file.
-     *
-     * @param file destination file
-     * @throws IOException if writing fails
-     */
     public void saveProductsToFile(File file) throws IOException {
         List<Product> snapshot;
         synchronized (engine) {
@@ -133,23 +187,12 @@ public class StoreController {
     // Orders / History
     // ---------------------------------------------------------------------
 
-    /**
-     * Returns all orders in the system (manager usage).
-     *
-     * @return list of all orders
-     */
     public List<Order> getAllOrders() {
         synchronized (engine) {
             return engine.getAllOrders();
         }
     }
 
-    /**
-     * Returns the order history for the current customer only.
-     * Orders are filtered by the username stored in the Order.
-     *
-     * @return list of orders that belong to the current customer
-     */
     public List<Order> getCustomerOrders() {
         List<Order> result = new ArrayList<>();
 
@@ -176,18 +219,6 @@ public class StoreController {
         return result;
     }
 
-    /**
-     * Performs checkout for the current customer.
-     * <p>
-     * Flow:
-     * 1) validate stock for all cart items
-     * 2) decrease stock (rollback on failure)
-     * 3) create order in engine (clears the cart)
-     * 4) append order to order-history file
-     * </p>
-     *
-     * @return true if checkout succeeded; false otherwise
-     */
     public boolean checkout() {
         if (customer == null) {
             return false;
@@ -201,7 +232,6 @@ public class StoreController {
 
             List<CartItem> items = cart.getItems();
 
-            // validate
             for (CartItem item : items) {
                 if (item == null) return false;
 
@@ -212,7 +242,6 @@ public class StoreController {
                 if (p.getStock() < qty) return false;
             }
 
-            // decrease stock (with rollback)
             List<CartItem> decreased = new ArrayList<>();
             for (CartItem item : items) {
                 Product p = item.getProduct();
@@ -228,7 +257,6 @@ public class StoreController {
                 decreased.add(item);
             }
 
-            // create order (includes username, clears cart, adds to engine history)
             Order order = engine.createOrderFromCustomer(customer);
             if (order == null) {
                 for (CartItem item : decreased) {
@@ -237,9 +265,14 @@ public class StoreController {
                 return false;
             }
 
-            // persist
-            OrderHistoryIO.appendOrder(order);
+            try {
+                shippingProvider.shipOrder(order);
+            } catch (RuntimeException ex) {
+                System.err.println("Shipping failed: " + ex.getMessage());
+                return false;
+            }
 
+            OrderHistoryIO.appendOrder(order);
             return true;
         }
     }
@@ -248,13 +281,6 @@ public class StoreController {
     // Cart (Customer)
     // ---------------------------------------------------------------------
 
-    /**
-     * Adds a product to the current customer's cart.
-     *
-     * @param product  product to add
-     * @param quantity quantity to add
-     * @return true if added; false otherwise
-     */
     public boolean addToCart(Product product, int quantity) {
         if (customer == null) return false;
         synchronized (engine) {
@@ -262,11 +288,6 @@ public class StoreController {
         }
     }
 
-    /**
-     * Returns current customer's cart items.
-     *
-     * @return list of cart items
-     */
     public List<CartItem> getItems() {
         if (customer == null) return new ArrayList<>();
         synchronized (engine) {
@@ -274,12 +295,6 @@ public class StoreController {
         }
     }
 
-    /**
-     * Removes a product from the current customer's cart.
-     *
-     * @param product product to remove
-     * @return true if removed; false otherwise
-     */
     public boolean removeFromCart(Product product) {
         if (customer == null) return false;
         synchronized (engine) {
@@ -291,21 +306,10 @@ public class StoreController {
     // Permissions (Manager)
     // ---------------------------------------------------------------------
 
-    /**
-     * Returns whether the current session has manager permissions.
-     *
-     * @return true if manager mode is active; false otherwise
-     */
     public boolean canManage() {
         return manager != null;
     }
 
-    /**
-     * Adds a new product to the catalog (manager only).
-     *
-     * @param product product to add
-     * @return true if added; false otherwise
-     */
     public boolean addProduct(Product product) {
         if (!canManage() || product == null) return false;
 
@@ -315,34 +319,29 @@ public class StoreController {
         }
     }
 
-    /**
-     * Increases stock of an existing product (manager only).
-     *
-     * @param product product to update
-     * @param amount  amount to increase (must be > 0)
-     * @return true if succeeded; false otherwise
-     */
     public boolean increaseStock(Product product, int amount) {
         if (!canManage() || product == null || amount <= 0) return false;
 
         synchronized (engine) {
-            product.increaseStock(amount);
-            return true;
+            return engine.increaseStock(product, amount);
         }
     }
 
-    /**
-     * Decreases stock of an existing product (manager only).
-     *
-     * @param product product to update
-     * @param amount  amount to decrease (must be > 0)
-     * @return true if succeeded; false otherwise
-     */
     public boolean decreaseStock(Product product, int amount) {
         if (!canManage() || product == null || amount <= 0) return false;
 
         synchronized (engine) {
-            return product.decreaseStock(amount);
+            return engine.decreaseStock(product, amount);
         }
     }
+
+    public double getPriceAfterDiscount(Product product) {
+        if (product == null) return 0.0;
+        synchronized (engine) {
+            DiscountStrategy s = engine.getDiscountStrategy();
+            double base = product.getPrice();
+            return (s == null) ? base : s.apply(base);
+        }
+    }
+
 }

@@ -6,6 +6,7 @@
 package store.gui.view;
 
 import store.cart.CartItem;
+import store.core.SystemUpdatable;
 import store.gui.controller.StoreController;
 import store.gui.util.WindowWorker;
 import store.products.Category;
@@ -46,8 +47,14 @@ import java.util.List;
  * Potentially slow operations (file IO / checkout operations) are executed asynchronously using
  * {@link WindowWorker} to keep the Swing Event Dispatch Thread responsive.
  * </p>
+ *
+ * <p>
+ * Observer:
+ * The window registers itself as a {@link SystemUpdatable} observer on the store engine.
+ * Any model change triggers {@link #update()} which refreshes the UI on the Swing EDT.
+ * </p>
  */
-public class StoreWindow extends JFrame {
+public class StoreWindow extends JFrame implements SystemUpdatable {
 
     // -------------------------------------------------------------------------
     // Singleton (Manager GUI)
@@ -58,14 +65,6 @@ public class StoreWindow extends JFrame {
 
     /**
      * Opens the manager store window as a Singleton.
-     * <p>
-     * Important behavior for the assignment requirement:
-     * </p>
-     * <ul>
-     *   <li>No additional manager window instances are created while one already exists.</li>
-     *   <li>If the manager window is already open, it is brought to the front (instead of opening a new one).</li>
-     *   <li>When the manager window is closed, the singleton reference is cleared, allowing reopening later.</li>
-     * </ul>
      *
      * @param controller controller configured for a manager session
      * @throws IllegalArgumentException if {@code controller} is {@code null}
@@ -75,14 +74,11 @@ public class StoreWindow extends JFrame {
             throw new IllegalArgumentException("controller cannot be null");
         }
 
-        // If there is no existing instance (or it was disposed), create a new one.
         if (managerInstance == null || !managerInstance.isDisplayable()) {
             managerInstance = new StoreWindow(controller);
             managerInstance.setTitle("Online Store - Manager");
             managerInstance.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
 
-            // When the manager window closes, clear the singleton reference,
-            // so future calls can create a fresh instance.
             managerInstance.addWindowListener(new WindowAdapter() {
                 @Override
                 public void windowClosed(WindowEvent e) {
@@ -90,13 +86,10 @@ public class StoreWindow extends JFrame {
                 }
             });
         } else {
-            // Manager window already exists:
-            // DO NOT create another instance; bring the existing window to the front.
             managerInstance.setVisible(true);
             managerInstance.toFront();
             managerInstance.requestFocus();
 
-            // Helps on Windows in cases where toFront() is not enough.
             managerInstance.setAlwaysOnTop(true);
             managerInstance.setAlwaysOnTop(false);
         }
@@ -123,26 +116,17 @@ public class StoreWindow extends JFrame {
     /** Shopping cart panel (customer only; {@code null} for manager). */
     private CartPanel cartPanel;
 
+    /** Prevents flooding the EDT with repeated full refreshes. */
+    private boolean refreshQueued = false;
+
     // --- Action buttons (some appear only for manager UI) ---
-    /** Loads products from a file (manager only). */
     private final JButton loadButton = new JButton("Load");
-
-    /** Saves products to a file (manager only). */
     private final JButton saveButton = new JButton("Save");
-
-    /** Opens the catalog management dialog (manager only). */
     private final JButton manageCatalogButton = new JButton("Manage Catalog");
-
-    /** Opens the order history dialog (both customer and manager). */
     private final JButton historyButton = new JButton("Order History");
 
-    /** Search input field (always visible). */
     private final JTextField searchField = new JTextField(18);
-
-    /** Clears search and category filters (always visible). */
     private final JButton clearSearchButton = new JButton("Clear");
-
-    /** Category filter combo box ("All" + categories) (always visible). */
     private final JComboBox<Object> categoryCombo = new JComboBox<>();
 
     // -------------------------------------------------------------------------
@@ -151,13 +135,6 @@ public class StoreWindow extends JFrame {
 
     /**
      * Constructs the main store window.
-     * <p>
-     * The window layout includes a top bar with a title, filters, and role-based action buttons,
-     * a center catalog grid, and (for customers only) a right-side panel with product details and cart.
-     * </p>
-     * <p>
-     * A dedicated {@link WindowWorker} is created per window instance and closed when the window closes.
-     * </p>
      *
      * @param storeController the store controller used by this window
      * @throws IllegalArgumentException if {@code storeController} is {@code null}
@@ -172,11 +149,13 @@ public class StoreWindow extends JFrame {
         String roleName = controller.canManage() ? "Manager" : "Customer";
         this.worker = new WindowWorker(roleName + "-WindowWorker-" + System.identityHashCode(this));
 
-        // Ensures resources are released when the window is closed.
-        // Closes the associated WindowWorker and disposes the frame.
+        // Register as observer.
+        this.controller.getEngine().addObserver(this);
+
         addWindowListener(new WindowAdapter() {
             @Override
             public void windowClosed(WindowEvent e) {
+                controller.getEngine().removeObserver(StoreWindow.this);
                 worker.close();
             }
 
@@ -192,7 +171,6 @@ public class StoreWindow extends JFrame {
         setExtendedState(JFrame.MAXIMIZED_BOTH);
         setLayout(new BorderLayout(10, 10));
 
-        // NORTH: Title (centered) + Filters (below title) + Actions (right)
         JPanel topBar = new JPanel(new BorderLayout(10, 10));
 
         JPanel centerBlock = new JPanel();
@@ -232,36 +210,29 @@ public class StoreWindow extends JFrame {
 
             add(rightPanel, BorderLayout.EAST);
         } else {
-            // Manager: no right-side panel
             detailsPanel = null;
             cartPanel = null;
         }
 
-        // Wire actions (always)
         wireActions();
 
-        // Wire customer-only cart/details listeners
         if (!controller.canManage()) {
             wireCartAndDetails();
         }
 
         // Initial load / filters
         refreshCatalogView();
+
+        // Initial cart totals (customer only)
+        if (cartPanel != null) {
+            updateCartTotals(controller.getItems());
+        }
     }
 
     // -------------------------------------------------------------------------
     // UI Builders
     // -------------------------------------------------------------------------
 
-    /**
-     * Builds the filters panel (always visible).
-     * <p>
-     * Includes a live search field, a clear button, and a category combo box.
-     * Any change triggers {@link #applyFilters()} to refresh the catalog grid.
-     * </p>
-     *
-     * @return a configured filters panel
-     */
     private JPanel buildFiltersPanel() {
         JPanel filtersBar = new JPanel(new FlowLayout(FlowLayout.CENTER));
 
@@ -273,7 +244,6 @@ public class StoreWindow extends JFrame {
         filtersBar.add(new JLabel("Category:"));
         filtersBar.add(categoryCombo);
 
-        // Live search
         searchField.getDocument().addDocumentListener(new javax.swing.event.DocumentListener() {
             private void apply() { applyFilters(); }
             @Override public void insertUpdate(javax.swing.event.DocumentEvent e) { apply(); }
@@ -292,37 +262,18 @@ public class StoreWindow extends JFrame {
         return filtersBar;
     }
 
-    /**
-     * Builds the actions panel based on the current user's role.
-     * <p>
-     * Managers receive Load/Save/Manage Catalog + Order History.
-     * Customers receive only Order History.
-     * </p>
-     *
-     * @return the role-specific actions panel
-     */
     private JPanel buildActionsPanel() {
         return controller.canManage()
                 ? buildManagerActionsPanel()
                 : buildCustomerActionsPanel();
     }
 
-    /**
-     * Builds the customer actions panel.
-     *
-     * @return a panel containing customer actions
-     */
     private JPanel buildCustomerActionsPanel() {
         JPanel p = new JPanel(new FlowLayout(FlowLayout.RIGHT));
         p.add(historyButton);
         return p;
     }
 
-    /**
-     * Builds the manager actions panel.
-     *
-     * @return a panel containing manager actions
-     */
     private JPanel buildManagerActionsPanel() {
         JPanel p = new JPanel(new FlowLayout(FlowLayout.RIGHT));
         p.add(loadButton);
@@ -336,16 +287,8 @@ public class StoreWindow extends JFrame {
     // Wiring
     // -------------------------------------------------------------------------
 
-    /**
-     * Wires action buttons to their handlers.
-     * <p>
-     * File operations (load/save) are executed asynchronously via {@link WindowWorker}
-     * to avoid blocking the Swing EDT.
-     * </p>
-     */
     private void wireActions() {
 
-        // Load products (manager only)
         loadButton.addActionListener(e -> {
             JFileChooser chooser = new JFileChooser();
             int result = chooser.showOpenDialog(this);
@@ -380,7 +323,6 @@ public class StoreWindow extends JFrame {
             );
         });
 
-        // Save products (manager only)
         saveButton.addActionListener(e -> {
             JFileChooser chooser = new JFileChooser();
             int result = chooser.showSaveDialog(this);
@@ -412,13 +354,12 @@ public class StoreWindow extends JFrame {
             );
         });
 
-        // Manage catalog (manager only)
         manageCatalogButton.addActionListener(e -> {
             CatalogManagementWindow.open(this, controller);
+            // Dialog is modal; after it closes, refresh categories (might have changed).
             refreshCatalogView();
         });
 
-        // Order history (both)
         historyButton.addActionListener(e -> {
             OrderHistoryWindow dialog = new OrderHistoryWindow(this, controller);
             dialog.setVisible(true);
@@ -426,18 +367,27 @@ public class StoreWindow extends JFrame {
     }
 
     /**
+     * Updates cart rows + totals (subtotal/discount/final total).
+     */
+    private void updateCartTotals(List<CartItem> items) {
+        if (cartPanel == null) return;
+
+        cartPanel.setItems(items);
+
+        double subtotal = controller.getCartSubtotal();
+        double finalTotal = controller.getCartTotalAfterDiscount();
+        String discountText = controller.getDiscountDisplayName();
+
+        cartPanel.setTotals(subtotal, discountText, finalTotal);
+    }
+
+    /**
      * Wires customer-only interactions for cart and product details.
+     *
      * <p>
-     * Handles:
-     * </p>
-     * <ul>
-     *   <li>Removing items from the cart</li>
-     *   <li>Checkout</li>
-     *   <li>Adding the selected product to the cart</li>
-     * </ul>
-     * <p>
-     * Each operation runs asynchronously using {@link WindowWorker} and then updates
-     * the UI using a {@link UiSnapshot} returned from the background task.
+     * Important: When using Observer updates, we avoid rebuilding the catalog grid manually
+     * in these callbacks. The engine notification will trigger {@link #update()} which refreshes
+     * the UI once (coalesced).
      * </p>
      */
     private void wireCartAndDetails() {
@@ -453,7 +403,7 @@ public class StoreWindow extends JFrame {
             worker.runAsync(
                     () -> {
                         boolean removed = controller.removeFromCart(p);
-                        return new UiSnapshot(removed, controller.getItems(), controller.getAllProducts());
+                        return new UiSnapshot(removed, controller.getItems());
                     },
                     snapshot -> {
                         if (!snapshot.success) {
@@ -466,10 +416,9 @@ public class StoreWindow extends JFrame {
                             return;
                         }
 
-                        cartPanel.setItems(snapshot.items);
-                        setCatalogProducts(snapshot.products);
+                        // Update only the cart/details here; catalog refresh is handled by Observer update().
+                        updateCartTotals(snapshot.items);
                         detailsPanel.setProduct(detailsPanel.getProduct());
-                        applyFilters();
                     },
                     ex -> JOptionPane.showMessageDialog(
                             this,
@@ -484,13 +433,11 @@ public class StoreWindow extends JFrame {
             worker.runAsync(
                     () -> {
                         boolean ok = controller.checkout();
-                        return new UiSnapshot(ok, controller.getItems(), controller.getAllProducts());
+                        return new UiSnapshot(ok, controller.getItems());
                     },
                     snapshot -> {
-                        cartPanel.setItems(snapshot.items);
-                        setCatalogProducts(snapshot.products);
+                        updateCartTotals(snapshot.items);
                         detailsPanel.setProduct(detailsPanel.getProduct());
-                        applyFilters();
 
                         if (snapshot.success) {
                             JOptionPane.showMessageDialog(
@@ -525,13 +472,11 @@ public class StoreWindow extends JFrame {
             worker.runAsync(
                     () -> {
                         boolean added = controller.addToCart(p, quantity);
-                        return new UiSnapshot(added, controller.getItems(), controller.getAllProducts());
+                        return new UiSnapshot(added, controller.getItems());
                     },
                     snapshot -> {
-                        cartPanel.setItems(snapshot.items);
-                        setCatalogProducts(snapshot.products);
+                        updateCartTotals(snapshot.items);
                         detailsPanel.setProduct(p);
-                        applyFilters();
 
                         if (snapshot.success) {
                             detailsPanel.showAddedFeedback();
@@ -560,10 +505,6 @@ public class StoreWindow extends JFrame {
 
     /**
      * Sets the catalog products and rebuilds the catalog grid UI.
-     * <p>
-     * Each product is shown using a {@link ProductPanel}. Clicking a product panel
-     * updates the {@link ProductDetailsPanel} (customer only).
-     * </p>
      *
      * @param products products to display
      */
@@ -571,13 +512,12 @@ public class StoreWindow extends JFrame {
         catalogPanel.removeAll();
 
         for (Product p : products) {
-            ProductPanel panel = new ProductPanel(p);
+            ProductPanel panel = new ProductPanel(p, controller);
 
-            // When a product is clicked, show its details (customer only).
             panel.addMouseListener(new MouseAdapter() {
                 @Override
                 public void mouseClicked(MouseEvent e) {
-                    if (detailsPanel != null) { // customer only
+                    if (detailsPanel != null) {
                         detailsPanel.setProduct(p);
                     }
                 }
@@ -590,15 +530,6 @@ public class StoreWindow extends JFrame {
         catalogPanel.repaint();
     }
 
-    /**
-     * Rebuilds the category combo box from the given products.
-     * <p>
-     * Always includes an "All" option as the first entry.
-     * Categories are collected from the products list and displayed in alphabetical order.
-     * </p>
-     *
-     * @param products products list
-     */
     private void rebuildCategoryCombo(List<Product> products) {
         categoryCombo.removeAllItems();
         categoryCombo.addItem("All");
@@ -617,13 +548,6 @@ public class StoreWindow extends JFrame {
         }
     }
 
-    /**
-     * Applies search and category filters and refreshes the catalog grid.
-     * <p>
-     * Search is performed as a case-insensitive substring match on the product name.
-     * Category matches either "All" or the exact selected {@link Category}.
-     * </p>
-     */
     private void applyFilters() {
         String text = (searchField.getText() == null)
                 ? ""
@@ -653,27 +577,39 @@ public class StoreWindow extends JFrame {
         setCatalogProducts(filtered);
     }
 
-    /**
-     * Refreshes category options and then applies the current filters.
-     * <p>
-     * This method is an internal helper invoked when the catalog may have changed
-     * (e.g., after load/save/manage operations).
-     * </p>
-     */
     private void refreshFiltersAfterCatalogChange() {
         rebuildCategoryCombo(controller.getAllProducts());
         applyFilters();
     }
 
-    /**
-     * Refreshes the catalog view using the current controller state.
-     * <p>
-     * Other windows (such as {@link CatalogManagementWindow}) should call this method
-     * to request a safe UI refresh instead of manipulating internal filter logic.
-     * </p>
-     */
     public void refreshCatalogView() {
         refreshFiltersAfterCatalogChange();
+    }
+
+    // -------------------------------------------------------------------------
+    // Observer
+    // -------------------------------------------------------------------------
+
+    /**
+     * Receives model-change notifications from the store engine.
+     * Coalesces rapid successive updates to avoid flooding the EDT with heavy UI rebuilds.
+     */
+    @Override
+    public void update() {
+        if (refreshQueued) return;
+        refreshQueued = true;
+
+        SwingUtilities.invokeLater(() -> {
+            try {
+                applyFilters();
+
+                if (cartPanel != null) {
+                    updateCartTotals(controller.getItems());
+                }
+            } finally {
+                refreshQueued = false;
+            }
+        });
     }
 
     // -------------------------------------------------------------------------
@@ -682,31 +618,14 @@ public class StoreWindow extends JFrame {
 
     /**
      * Immutable UI snapshot used to update the view after background operations.
-     * <p>
-     * Holds:
-     * </p>
-     * <ul>
-     *   <li>{@code success}: whether the requested operation succeeded</li>
-     *   <li>{@code items}: the current cart contents</li>
-     *   <li>{@code products}: the current product catalog</li>
-     * </ul>
      */
     private static final class UiSnapshot {
         private final boolean success;
         private final java.util.List<CartItem> items;
-        private final java.util.List<Product> products;
 
-        /**
-         * Creates a snapshot representing the UI state after an operation.
-         *
-         * @param success  whether the operation succeeded
-         * @param items    current cart items
-         * @param products current catalog products
-         */
-        private UiSnapshot(boolean success, java.util.List<CartItem> items, java.util.List<Product> products) {
+        private UiSnapshot(boolean success, java.util.List<CartItem> items) {
             this.success = success;
             this.items = items;
-            this.products = products;
         }
     }
 }

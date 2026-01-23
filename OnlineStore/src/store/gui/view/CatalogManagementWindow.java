@@ -5,12 +5,16 @@
  */
 package store.gui.view;
 
+import store.core.SystemUpdatable;
 import store.gui.controller.StoreController;
-import store.products.BookProduct;
 import store.products.Category;
-import store.products.ClothingProduct;
-import store.products.ElectronicsProduct;
 import store.products.Product;
+import store.products.ProductFactory;
+
+import store.reports.ConsoleWriter;
+import store.reports.InventoryReport;
+import store.reports.ReportWriter;
+import store.reports.SalesReport;
 
 import javax.swing.*;
 import java.awt.*;
@@ -22,44 +26,27 @@ import java.io.IOException;
 import java.util.List;
 
 /**
- * CatalogManagementWindow is a manager-only dialog for catalog / inventory management.
+ * Modal manager-only dialog for managing the product catalog and inventory.
  *
  * <p>
- * Supported operations:
+ * The dialog provides operations such as:
  * </p>
  * <ul>
- *   <li>Delete a product</li>
- *   <li>Increase / decrease stock for a product</li>
- *   <li>Add a new product</li>
+ *   <li>Removing products from the catalog</li>
+ *   <li>Increasing/decreasing stock</li>
+ *   <li>Adding new products</li>
+ *   <li>Generating inventory/sales reports to console or CSV</li>
+ *   <li><b>NEW:</b> Switching the store-wide discount strategy at runtime (Strategy pattern)</li>
  * </ul>
  *
  * <p>
- * Singleton (dialog-level):
- * The dialog is opened via {@link #open(StoreWindow, StoreController)} and guarantees that only one
- * dialog instance exists at any given time. If {@code open(...)} is called while the dialog is already
- * open, the existing dialog is brought to the front (no new instance is created).
- * </p>
- *
- * <p>
- * Persistence rule:
- * After every successful catalog change, the catalog is saved to a default CSV file.
+ * This dialog observes store model changes and refreshes its list automatically.
  * </p>
  */
-public class CatalogManagementWindow extends JDialog {
+public class CatalogManagementWindow extends JDialog implements SystemUpdatable {
 
-    // -------------------------------------------------------------------------
-    // Static / Constants
-    // -------------------------------------------------------------------------
-
-    /** Singleton instance of the catalog management dialog. */
     private static CatalogManagementWindow instance;
-
-    /** Default file used to persist the catalog after successful changes. */
     private static final File DEFAULT_CATALOG_FILE = new File("products_catalog.csv");
-
-    // -------------------------------------------------------------------------
-    // Data members (fields)
-    // -------------------------------------------------------------------------
 
     private final StoreController controller;
     private final StoreWindow parentWindow;
@@ -73,27 +60,19 @@ public class CatalogManagementWindow extends JDialog {
     private final JButton addProductButton;
     private final JButton closeButton;
 
+    private final JButton printReportButton;
+    private final JButton saveReportButton;
+
     private final JSpinner stockSpinner;
 
-    // -------------------------------------------------------------------------
-    // Singleton open (Dialog-level Singleton)
-    // -------------------------------------------------------------------------
+    // -------------------------
+    // NEW: Discount controls
+    // -------------------------
+    private final JLabel currentDiscountLabel;
+    private final JComboBox<String> discountTypeCombo;
+    private final JSpinner percentSpinner;
+    private final JButton applyDiscountButton;
 
-    /**
-     * Opens the catalog management dialog as a Singleton.
-     * <p>
-     * Important behavior:
-     * </p>
-     * <ul>
-     *   <li>No additional dialog instances are created while one already exists.</li>
-     *   <li>If the dialog is already open, it is brought to the front (instead of opening a new one).</li>
-     *   <li>When the dialog is closed, the singleton reference is cleared so it can be opened again.</li>
-     * </ul>
-     *
-     * @param parentWindow parent {@link StoreWindow} for positioning/ownership
-     * @param controller   controller used to perform catalog operations
-     * @throws IllegalArgumentException if {@code parentWindow} or {@code controller} is {@code null}
-     */
     public static void open(StoreWindow parentWindow, StoreController controller) {
         if (parentWindow == null) {
             throw new IllegalArgumentException("parentWindow cannot be null");
@@ -102,11 +81,9 @@ public class CatalogManagementWindow extends JDialog {
             throw new IllegalArgumentException("controller cannot be null");
         }
 
-        // If it was disposed (or never created) - create a fresh dialog instance.
         if (instance == null || !instance.isDisplayable()) {
             instance = new CatalogManagementWindow(parentWindow, controller);
 
-            // When closed, clear the singleton reference to allow reopening later.
             instance.addWindowListener(new WindowAdapter() {
                 @Override
                 public void windowClosed(WindowEvent e) {
@@ -119,14 +96,11 @@ public class CatalogManagementWindow extends JDialog {
                 }
             });
         } else {
-            // Dialog already exists:
-            // DO NOT create a new instance; bring the existing dialog to the front.
             instance.setLocationRelativeTo(parentWindow);
             instance.setVisible(true);
             instance.toFront();
             instance.requestFocus();
 
-            // Helps on Windows in cases where toFront() is not enough.
             instance.setAlwaysOnTop(true);
             instance.setAlwaysOnTop(false);
         }
@@ -134,23 +108,6 @@ public class CatalogManagementWindow extends JDialog {
         instance.setVisible(true);
     }
 
-    // -------------------------------------------------------------------------
-    // Constructor
-    // -------------------------------------------------------------------------
-
-    /**
-     * Constructs the catalog / inventory management dialog.
-     * <p>
-     * This dialog is intended for managers only. If the current user does not have manager
-     * permissions, an error is shown and an {@link IllegalStateException} is thrown.
-     * </p>
-     *
-     * @param parentWindow the parent {@link StoreWindow} that owns this dialog
-     * @param controller   the store controller used to perform catalog operations
-     *
-     * @throws IllegalArgumentException if {@code parentWindow} or {@code controller} is {@code null}
-     * @throws IllegalStateException if the user does not have manager permissions
-     */
     public CatalogManagementWindow(StoreWindow parentWindow, StoreController controller) {
         super(parentWindow, "Catalog / Inventory Management", true);
 
@@ -175,11 +132,28 @@ public class CatalogManagementWindow extends JDialog {
             throw new IllegalStateException("Manager permissions required");
         }
 
-        setSize(750, 470);
+        // Register as observer (Observer pattern).
+        this.controller.getEngine().addObserver(this);
+
+        // Ensure we unregister when the dialog is closed.
+        addWindowListener(new WindowAdapter() {
+            @Override
+            public void windowClosed(WindowEvent e) {
+                CatalogManagementWindow.this.controller.getEngine()
+                        .removeObserver(CatalogManagementWindow.this);
+            }
+
+            @Override
+            public void windowClosing(WindowEvent e) {
+                CatalogManagementWindow.this.controller.getEngine()
+                        .removeObserver(CatalogManagementWindow.this);
+            }
+        });
+
+        setSize(860, 520);
         setLocationRelativeTo(parentWindow);
         setLayout(new BorderLayout(10, 10));
 
-        // CENTER: Product list
         listModel = new DefaultListModel<>();
         productList = new JList<>(listModel);
         productList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
@@ -207,11 +181,50 @@ public class CatalogManagementWindow extends JDialog {
         });
         add(new JScrollPane(productList), BorderLayout.CENTER);
 
-        // EAST: Stock controls + buttons
         JPanel rightPanel = new JPanel();
         rightPanel.setLayout(new BoxLayout(rightPanel, BoxLayout.Y_AXIS));
         rightPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
 
+        // -------------------------
+        // NEW: Discount area (top)
+        // -------------------------
+        rightPanel.add(new JLabel("Store Discount:"));
+        rightPanel.add(Box.createVerticalStrut(6));
+
+        currentDiscountLabel = new JLabel("Current: " + controller.getDiscountDisplayName());
+        currentDiscountLabel.setFont(currentDiscountLabel.getFont().deriveFont(Font.BOLD));
+        rightPanel.add(currentDiscountLabel);
+
+        rightPanel.add(Box.createVerticalStrut(8));
+
+        discountTypeCombo = new JComboBox<>(new String[]{"No discount", "Percentage"});
+        discountTypeCombo.setMaximumSize(new Dimension(Integer.MAX_VALUE, discountTypeCombo.getPreferredSize().height));
+        rightPanel.add(discountTypeCombo);
+
+        rightPanel.add(Box.createVerticalStrut(6));
+
+        JPanel percentRow = new JPanel(new BorderLayout(6, 0));
+        percentRow.add(new JLabel("Percent:"), BorderLayout.WEST);
+
+        percentSpinner = new JSpinner(new SpinnerNumberModel(10, 0, 100, 1));
+        percentSpinner.setPreferredSize(new Dimension(80, percentSpinner.getPreferredSize().height));
+        percentRow.add(percentSpinner, BorderLayout.EAST);
+
+        percentRow.setMaximumSize(new Dimension(Integer.MAX_VALUE, percentRow.getPreferredSize().height));
+        rightPanel.add(percentRow);
+
+        rightPanel.add(Box.createVerticalStrut(8));
+
+        applyDiscountButton = new JButton("Apply Discount");
+        rightPanel.add(applyDiscountButton);
+
+        rightPanel.add(Box.createVerticalStrut(16));
+        rightPanel.add(new JSeparator());
+        rightPanel.add(Box.createVerticalStrut(12));
+
+        // -------------------------
+        // Existing: Stock controls
+        // -------------------------
         rightPanel.add(new JLabel("Stock change amount:"));
         stockSpinner = new JSpinner(new SpinnerNumberModel(1, 1, 1_000_000, 1));
         stockSpinner.setMaximumSize(new Dimension(Integer.MAX_VALUE, stockSpinner.getPreferredSize().height));
@@ -230,9 +243,19 @@ public class CatalogManagementWindow extends JDialog {
         rightPanel.add(Box.createVerticalStrut(14));
         rightPanel.add(addProductButton);
 
+        rightPanel.add(Box.createVerticalStrut(18));
+        rightPanel.add(new JSeparator());
+        rightPanel.add(Box.createVerticalStrut(12));
+
+        printReportButton = new JButton("Print Report to Console");
+        saveReportButton = new JButton("Save Report to CSV");
+
+        rightPanel.add(printReportButton);
+        rightPanel.add(Box.createVerticalStrut(6));
+        rightPanel.add(saveReportButton);
+
         add(rightPanel, BorderLayout.EAST);
 
-        // SOUTH: Delete + Close
         removeButton = new JButton("Delete selected product");
         closeButton = new JButton("Close");
 
@@ -241,24 +264,79 @@ public class CatalogManagementWindow extends JDialog {
         bottomPanel.add(closeButton);
         add(bottomPanel, BorderLayout.SOUTH);
 
-        // Initial data
         refreshProductList();
 
-        // Wiring
         removeButton.addActionListener(this::onRemoveClicked);
         increaseStockButton.addActionListener(this::onIncreaseStock);
         decreaseStockButton.addActionListener(this::onDecreaseStock);
         addProductButton.addActionListener(this::onAddProduct);
         closeButton.addActionListener(e -> dispose());
+
+        printReportButton.addActionListener(this::onPrintReportToConsole);
+        saveReportButton.addActionListener(this::onSaveReportToCsv);
+
+        // -------------------------
+        // NEW: wire discount events
+        // -------------------------
+        discountTypeCombo.addActionListener(e -> updateDiscountControlsEnabledState());
+        updateDiscountControlsEnabledState();
+        applyDiscountButton.addActionListener(this::onApplyDiscount);
     }
 
-    // -------------------------------------------------------------------------
-    // Helpers
-    // -------------------------------------------------------------------------
+    // -------------------------
+    // NEW: Discount logic
+    // -------------------------
 
-    /**
-     * Reloads the product list displayed in this management dialog.
-     */
+    private void updateDiscountControlsEnabledState() {
+        String type = (String) discountTypeCombo.getSelectedItem();
+        boolean percentage = "Percentage".equals(type);
+        percentSpinner.setEnabled(percentage);
+    }
+
+    private double getPercentValue() {
+        Object v = percentSpinner.getValue();
+        if (v instanceof Integer) return (Integer) v;
+        if (v instanceof Number) return ((Number) v).doubleValue();
+        return 0.0;
+    }
+
+    private void onApplyDiscount(ActionEvent e) {
+        String type = (String) discountTypeCombo.getSelectedItem();
+        boolean ok;
+
+        if ("Percentage".equals(type)) {
+            double percent = getPercentValue();
+            ok = controller.setPercentageDiscount(percent);
+        } else {
+            ok = controller.setNoDiscount();
+        }
+
+        if (!ok) {
+            JOptionPane.showMessageDialog(
+                    this,
+                    "Failed to apply discount (manager permissions required).",
+                    "Error",
+                    JOptionPane.ERROR_MESSAGE
+            );
+            return;
+        }
+
+        // After applying, engine notifies observers (including customers).
+        // We update our own label immediately too.
+        currentDiscountLabel.setText("Current: " + controller.getDiscountDisplayName());
+
+        JOptionPane.showMessageDialog(
+                this,
+                "Discount updated successfully.",
+                "Discount",
+                JOptionPane.INFORMATION_MESSAGE
+        );
+    }
+
+    // -------------------------
+    // Existing code
+    // -------------------------
+
     private void refreshProductList() {
         listModel.clear();
         List<Product> products = controller.getAllProducts();
@@ -267,9 +345,6 @@ public class CatalogManagementWindow extends JDialog {
         }
     }
 
-    /**
-     * @return stock delta (minimum 1) from the spinner
-     */
     private int getStockDelta() {
         Object v = stockSpinner.getValue();
         if (v instanceof Integer) return (Integer) v;
@@ -277,9 +352,6 @@ public class CatalogManagementWindow extends JDialog {
         return 1;
     }
 
-    /**
-     * @return selected product, or {@code null} after showing a warning dialog if none is selected
-     */
     private Product getSelectedOrWarn() {
         Product selected = productList.getSelectedValue();
         if (selected == null) {
@@ -294,33 +366,32 @@ public class CatalogManagementWindow extends JDialog {
     }
 
     /**
-     * Refreshes both this dialog and the parent {@link StoreWindow} after a catalog change.
-     */
-    private void refreshEverywhere() {
-        refreshProductList();
-        parentWindow.refreshCatalogView();
-    }
-
-    /**
-     * Saves the current catalog to the default CSV file.
-     * Shows an error dialog if saving fails.
+     * Persists the current catalog snapshot to the default CSV file.
+     * The save is performed off the EDT to keep the UI responsive.
      */
     private void saveCatalogToDefaultFile() {
-        try {
-            controller.saveProductsToFile(DEFAULT_CATALOG_FILE);
-        } catch (IOException ex) {
-            JOptionPane.showMessageDialog(
-                    this,
-                    "Catalog was updated, but saving to CSV failed:\n" + ex.getMessage(),
-                    "Save Error",
-                    JOptionPane.ERROR_MESSAGE
-            );
-        }
-    }
+        new SwingWorker<Void, Void>() {
+            @Override
+            protected Void doInBackground() throws Exception {
+                controller.saveProductsToFile(DEFAULT_CATALOG_FILE);
+                return null;
+            }
 
-    // -------------------------------------------------------------------------
-    // Action handlers
-    // -------------------------------------------------------------------------
+            @Override
+            protected void done() {
+                try {
+                    get();
+                } catch (Exception ex) {
+                    JOptionPane.showMessageDialog(
+                            CatalogManagementWindow.this,
+                            "Catalog was updated, but saving to CSV failed:\n" + ex.getMessage(),
+                            "Save Error",
+                            JOptionPane.ERROR_MESSAGE
+                    );
+                }
+            }
+        }.execute();
+    }
 
     private void onRemoveClicked(ActionEvent e) {
         Product selected = getSelectedOrWarn();
@@ -341,7 +412,6 @@ public class CatalogManagementWindow extends JDialog {
         }
 
         saveCatalogToDefaultFile();
-        refreshEverywhere();
     }
 
     private void onIncreaseStock(ActionEvent e) {
@@ -356,7 +426,6 @@ public class CatalogManagementWindow extends JDialog {
         }
 
         saveCatalogToDefaultFile();
-        refreshEverywhere();
     }
 
     private void onDecreaseStock(ActionEvent e) {
@@ -376,7 +445,6 @@ public class CatalogManagementWindow extends JDialog {
         }
 
         saveCatalogToDefaultFile();
-        refreshEverywhere();
     }
 
     private void onAddProduct(ActionEvent e) {
@@ -390,25 +458,112 @@ public class CatalogManagementWindow extends JDialog {
         }
 
         saveCatalogToDefaultFile();
-        refreshEverywhere();
     }
 
-    // -------------------------------------------------------------------------
-    // Add-product dialog (will be refactored later to Factory+Builder)
-    // -------------------------------------------------------------------------
+    private void onPrintReportToConsole(ActionEvent e) {
+        String chosen = chooseReportType();
+        if (chosen == null) return;
 
-    /**
-     * Creates a concrete product instance based on the selected {@link Category}.
-     *
-     * <p>
-     * Current implementation uses concrete constructors:
-     * BOOKS -> {@link BookProduct}, CLOTHING -> {@link ClothingProduct}, ELECTRONICS -> {@link ElectronicsProduct}.
-     * </p>
-     *
-     * @return created product or {@code null} if cancelled/invalid
-     */
+        ReportWriter writer = new ConsoleWriter();
+
+        try {
+            if ("Inventory".equals(chosen)) {
+                InventoryReport report = new InventoryReport(writer);
+                report.generate(controller.getEngine());
+            } else {
+                SalesReport report = new SalesReport(writer);
+                report.generate(controller.getEngine());
+            }
+
+            JOptionPane.showMessageDialog(
+                    this,
+                    "Report printed to console.",
+                    "Report",
+                    JOptionPane.INFORMATION_MESSAGE
+            );
+        } catch (IOException ex) {
+            JOptionPane.showMessageDialog(
+                    this,
+                    "Failed to generate report:\n" + ex.getMessage(),
+                    "Report Error",
+                    JOptionPane.ERROR_MESSAGE
+            );
+        }
+    }
+
+    private void onSaveReportToCsv(ActionEvent e) {
+        String chosen = chooseReportType();
+        if (chosen == null) return;
+
+        JFileChooser chooser = new JFileChooser();
+        chooser.setDialogTitle("Save Report (CSV)");
+        chooser.setSelectedFile(new File(
+                "Inventory".equals(chosen) ? "inventory_report.csv" : "sales_report.csv"
+        ));
+
+        int res = chooser.showSaveDialog(this);
+        if (res != JFileChooser.APPROVE_OPTION) return;
+
+        File file = chooser.getSelectedFile();
+        if (file == null) return;
+
+        try {
+            store.reports.FileWriter writer = new store.reports.FileWriter(file);
+
+            if ("Inventory".equals(chosen)) {
+                InventoryReport report = new InventoryReport(writer);
+                report.generate(controller.getEngine());
+            } else {
+                SalesReport report = new SalesReport(writer);
+                report.generate(controller.getEngine());
+            }
+
+            JOptionPane.showMessageDialog(
+                    this,
+                    "Report saved to:\n" + file.getAbsolutePath(),
+                    "Report",
+                    JOptionPane.INFORMATION_MESSAGE
+            );
+        } catch (IOException ex) {
+            JOptionPane.showMessageDialog(
+                    this,
+                    "Failed to save report:\n" + ex.getMessage(),
+                    "Report Error",
+                    JOptionPane.ERROR_MESSAGE
+            );
+        }
+    }
+
+    private String chooseReportType() {
+        Object[] options = {"Inventory", "Sales"};
+
+        int res = JOptionPane.showOptionDialog(
+                this,
+                "Choose report type:",
+                "Report Type",
+                JOptionPane.DEFAULT_OPTION,
+                JOptionPane.QUESTION_MESSAGE,
+                null,
+                options,
+                options[0]
+        );
+
+        if (res < 0 || res >= options.length) {
+            return null;
+        }
+        return (String) options[res];
+    }
+
+    @Override
+    public void update() {
+        SwingUtilities.invokeLater(() -> {
+            refreshProductList();
+            // keep discount label synced (in case discount changed elsewhere)
+            currentDiscountLabel.setText("Current: " + controller.getDiscountDisplayName());
+        });
+    }
+
     private Product showAddProductDialog() {
-
         JTextField nameField = new JTextField(18);
         JTextField priceField = new JTextField(18);
         JTextField stockField = new JTextField(18);
@@ -624,7 +779,7 @@ public class CatalogManagementWindow extends JDialog {
                 return null;
             }
 
-            return new BookProduct(name, price, stock, desc, cat, color, img, author, pages);
+            return ProductFactory.createBook(name, price, stock, desc, color, img, author, pages);
         }
 
         if (cat == Category.CLOTHING) {
@@ -633,7 +788,7 @@ public class CatalogManagementWindow extends JDialog {
                 JOptionPane.showMessageDialog(this, "Size is required for clothing.", "Validation", JOptionPane.WARNING_MESSAGE);
                 return null;
             }
-            return new ClothingProduct(name, price, stock, desc, cat, color, img, size);
+            return ProductFactory.createClothing(name, price, stock, desc, color, img, size);
         }
 
         String warrantyText = warrantyField.getText() == null ? "" : warrantyField.getText().trim();
@@ -656,6 +811,6 @@ public class CatalogManagementWindow extends JDialog {
             return null;
         }
 
-        return new ElectronicsProduct(name, price, stock, desc, cat, color, img, warrantyMonths, brand);
+        return ProductFactory.createElectronics(name, price, stock, desc, color, img, warrantyMonths, brand);
     }
 }

@@ -43,18 +43,16 @@ public abstract class Product implements StoreEntity, PricedItem, StockManageabl
     private String imagePath;
 
     /**
-     * Creates a product with validated values and sensible defaults.
-     *
-     * @param name        product name (default used if null/blank)
-     * @param price       product price (default used if not positive)
-     * @param stock       initial stock (default used if negative)
-     * @param description product description (empty string used if null)
-     * @param category    product category (default used if null)
-     * @param color       product color (default used if null)
-     * @param imagePath   relative image path (default used if null/blank)
+     * Package-private constructor.
+     * <p>
+     * <b>Design Patterns:</b> Builder + Factory Method.
+     * Products must be created via {@link ProductFactory} and the relevant
+     * {@link ProductBuilder} implementation (not via {@code new} outside the
+     * {@code store.products} package).
+     * </p>
      */
-    public Product(String name, double price, int stock, String description,
-                   Category category, Color color, String imagePath) {
+    Product(String name, double price, int stock, String description,
+            Category category, Color color, String imagePath) {
 
         this.name = "Unknown product";
         this.price = 0.1;
@@ -82,48 +80,22 @@ public abstract class Product implements StoreEntity, PricedItem, StockManageabl
         setDescription(description);
     }
 
-    /**
-     * Returns the product name.
-     *
-     * @return the name
-     */
     public String getName() {
         return name;
     }
 
-    /**
-     * Returns the product description.
-     *
-     * @return the description (never null)
-     */
     public String getDescription() {
         return description;
     }
 
-    /**
-     * Returns the product category.
-     *
-     * @return the category
-     */
     public Category getCategory() {
         return category;
     }
 
-    /**
-     * Returns the product color.
-     *
-     * @return the color
-     */
     public Color getColor() {
         return color;
     }
 
-    /**
-     * Sets the stock value.
-     *
-     * @param stock the new stock
-     * @return true if assigned, false otherwise
-     */
     private boolean setStock(int stock) {
         if (stock < 0) {
             return false;
@@ -132,12 +104,6 @@ public abstract class Product implements StoreEntity, PricedItem, StockManageabl
         return true;
     }
 
-    /**
-     * Sets the product description.
-     *
-     * @param description the new description
-     * @return true if assigned, false otherwise
-     */
     protected boolean setDescription(String description) {
         if (description == null) {
             return false;
@@ -146,31 +112,16 @@ public abstract class Product implements StoreEntity, PricedItem, StockManageabl
         return true;
     }
 
-    /**
-     * Saves this product to a file.
-     *
-     * @param path destination path
-     */
     @Override
     public void saveToFile(String path) {
         // Not implemented in this version.
     }
 
-    /**
-     * Returns a short name for UI display.
-     *
-     * @return display name
-     */
     @Override
     public String getDisplayName() {
         return getName();
     }
 
-    /**
-     * Returns product details for UI display.
-     *
-     * @return multi-line details string
-     */
     @Override
     public String getDisplayDetails() {
         return "Name: " + getName() + "\n" +
@@ -181,22 +132,11 @@ public abstract class Product implements StoreEntity, PricedItem, StockManageabl
                 "Image: " + getImagePath() + "\n";
     }
 
-    /**
-     * Returns the product price.
-     *
-     * @return the price
-     */
     @Override
     public double getPrice() {
         return price;
     }
 
-    /**
-     * Sets the product price.
-     *
-     * @param price the new price
-     * @return true if assigned, false otherwise
-     */
     @Override
     public boolean setPrice(double price) {
         if (price <= 0) {
@@ -206,22 +146,11 @@ public abstract class Product implements StoreEntity, PricedItem, StockManageabl
         return true;
     }
 
-    /**
-     * Returns the current stock.
-     *
-     * @return stock amount
-     */
     @Override
     public int getStock() {
         return stock;
     }
 
-    /**
-     * Increases stock by the given amount.
-     *
-     * @param amount amount to add
-     * @return true if updated, false otherwise
-     */
     @Override
     public boolean increaseStock(int amount) {
         if (amount <= 0) {
@@ -231,12 +160,6 @@ public abstract class Product implements StoreEntity, PricedItem, StockManageabl
         return true;
     }
 
-    /**
-     * Decreases stock by the given amount.
-     *
-     * @param amount amount to subtract
-     * @return true if updated, false otherwise
-     */
     @Override
     public boolean decreaseStock(int amount) {
         if (amount <= 0) {
@@ -249,11 +172,6 @@ public abstract class Product implements StoreEntity, PricedItem, StockManageabl
         return true;
     }
 
-    /**
-     * Returns a short textual representation of the product.
-     *
-     * @return product string
-     */
     @Override
     public String toString() {
         return "Name: " + getName() + "\n" +
@@ -262,12 +180,6 @@ public abstract class Product implements StoreEntity, PricedItem, StockManageabl
                 "Stock: " + getStock();
     }
 
-    /**
-     * Compares products by class, name and category.
-     *
-     * @param o the object to compare
-     * @return true if equal, false otherwise
-     */
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
@@ -277,11 +189,6 @@ public abstract class Product implements StoreEntity, PricedItem, StockManageabl
                 this.category == other.category;
     }
 
-    /**
-     * Returns the image path.
-     *
-     * @return relative image path
-     */
     public String getImagePath() {
         return imagePath;
     }
